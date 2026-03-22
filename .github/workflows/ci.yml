@@ -1,4 +1,4 @@
-name: CI
+name: lightpanda
 
 on:
   push:
