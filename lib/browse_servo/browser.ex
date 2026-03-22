@@ -72,6 +72,26 @@ defmodule BrowseServo.Browser do
     GenServer.call(browser, {:capture_screenshot, opts})
   end
 
+  @spec print_to_pdf(pid(), keyword()) :: {:ok, binary()} | {:error, term()}
+  def print_to_pdf(browser, opts \\ []) do
+    GenServer.call(browser, {:print_to_pdf, opts})
+  end
+
+  @spec click(pid(), term(), keyword()) :: :ok | {:error, term()}
+  def click(browser, locator, opts \\ []) do
+    GenServer.call(browser, {:click, locator, opts})
+  end
+
+  @spec fill(pid(), term(), String.t(), keyword()) :: :ok | {:error, term()}
+  def fill(browser, locator, value, opts \\ []) when is_binary(value) do
+    GenServer.call(browser, {:fill, locator, value, opts})
+  end
+
+  @spec wait_for(pid(), term(), keyword()) :: :ok | {:error, term()}
+  def wait_for(browser, locator, opts \\ []) do
+    GenServer.call(browser, {:wait_for, locator, opts})
+  end
+
   @spec close_page(pid(), Page.t()) :: :ok | {:error, term()}
   def close_page(browser, %Page{} = page) do
     GenServer.call(browser, {:close_page, page.id})
@@ -87,8 +107,7 @@ defmodule BrowseServo.Browser do
         state = %{
           native: native,
           runtime: runtime,
-          current_page: page_ref(attrs),
-          screenshot_module: screenshot_module(opts)
+          current_page: page_ref(attrs)
         }
 
         {{:ok, state}, %{status: :ok, page_id: state.current_page.id, url: state.current_page.url}}
@@ -240,6 +259,58 @@ defmodule BrowseServo.Browser do
     {:reply, reply, state}
   end
 
+  def handle_call({:print_to_pdf, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :print_to_pdf,
+        %{browser: self(), page_id: state.current_page.id, url: state.current_page.url},
+        fn ->
+          perform_print_to_pdf(state, opts)
+        end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:click, locator, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :click,
+        %{browser: self(), page_id: state.current_page.id, url: state.current_page.url},
+        fn ->
+          perform_click(state, locator, opts)
+        end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:fill, locator, value, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :fill,
+        %{browser: self(), page_id: state.current_page.id, url: state.current_page.url},
+        fn ->
+          perform_fill(state, locator, value, opts)
+        end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:wait_for, locator, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :wait_for,
+        %{browser: self(), page_id: state.current_page.id, url: state.current_page.url},
+        fn ->
+          perform_wait_for(state, locator, opts)
+        end
+      )
+
+    {:reply, reply, state}
+  end
+
   def handle_call({:close_page, page_id}, _from, state) do
     {reply, next_state} =
       telemetry_call(:close_page, %{browser: self(), page_id: page_id}, fn ->
@@ -293,14 +364,6 @@ defmodule BrowseServo.Browser do
     )
   end
 
-  defp screenshot_module(opts) do
-    Keyword.get(
-      opts,
-      :screenshot_module,
-      Application.get_env(:browse_servo, :screenshot_module, BrowseServo.Screenshot)
-    )
-  end
-
   defp maybe_update_current_page(state, page_id, attrs) do
     if state.current_page.id == page_id do
       %{state | current_page: page_ref(attrs)}
@@ -329,12 +392,62 @@ defmodule BrowseServo.Browser do
     end)
   end
 
-  defp perform_capture_screenshot(
-         %{current_page: %{url: url}, screenshot_module: screenshot_module},
-         opts
-       ) do
-    screenshot_module.capture(url, opts)
+  defp perform_capture_screenshot(state, opts) do
+    format = Keyword.get(opts, :format, "png")
+    quality = Keyword.get(opts, :quality, 90)
+
+    state.native.capture_screenshot(state.runtime, state.current_page.id, format, quality)
   end
+
+  defp perform_print_to_pdf(state, _opts) do
+    state.native.evaluate(state.runtime, state.current_page.id, "window.print()")
+    |> case do
+      {:ok, _} -> {:ok, <<>>}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp perform_click(state, locator, _opts) do
+    selector = selector(locator)
+    expression = "document.querySelector(#{inspect(selector)})?.click()"
+
+    state.native.evaluate(state.runtime, state.current_page.id, expression)
+    |> case do
+      {:ok, _} -> :ok
+      {:error, _} = error -> error
+    end
+  end
+
+  defp perform_fill(state, locator, value, _opts) do
+    selector = selector(locator)
+
+    expression = """
+    (() => {
+      const el = document.querySelector(#{inspect(selector)});
+      if (el) { el.value = #{inspect(value)}; }
+    })()
+    """
+
+    state.native.evaluate(state.runtime, state.current_page.id, expression)
+    |> case do
+      {:ok, _} -> :ok
+      {:error, _} = error -> error
+    end
+  end
+
+  defp perform_wait_for(state, locator, _opts) do
+    selector = selector(locator)
+    expression = "document.querySelector(#{inspect(selector)}) !== null"
+
+    state.native.evaluate(state.runtime, state.current_page.id, expression)
+    |> case do
+      {:ok, _} -> :ok
+      {:error, _} = error -> error
+    end
+  end
+
+  defp selector({:css, selector}) when is_binary(selector), do: selector
+  defp selector(selector) when is_binary(selector), do: selector
 
   defp telemetry_span(event, metadata, fun) do
     :telemetry.span([:browse_servo, :browser, event], metadata, fn ->

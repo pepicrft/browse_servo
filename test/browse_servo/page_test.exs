@@ -5,11 +5,7 @@ defmodule BrowseServo.PageTest do
   alias BrowseServo.Page
 
   setup do
-    {:ok, browser} =
-      Browser.start_link(
-        native_module: BrowseServo.TestNative,
-        screenshot_module: BrowseServo.TestScreenshot
-      )
+    {:ok, browser} = Browser.start_link(native_module: BrowseServo.TestNative)
 
     {:ok, page} = Browser.new_page(browser, url: "https://example.com")
     %{page: page}
@@ -21,12 +17,14 @@ defmodule BrowseServo.PageTest do
   end
 
   test "reads title and content", %{page: page} do
-    assert Page.title(page) == {:ok, "Stub Title"}
-    assert Page.content(page) == {:ok, "<html><body>stub</body></html>"}
+    assert Page.title(page) == {:ok, "Example Title"}
+
+    assert Page.content(page) ==
+             {:ok, "<html><body><main data-testid=\"content\">content</main></body></html>"}
   end
 
   test "evaluates expressions", %{page: page} do
-    assert Page.evaluate(page, "document.title") == {:ok, "Stub Title"}
+    assert Page.evaluate(page, "document.title") == {:ok, "document.title"}
   end
 
   test "closes pages", %{page: page} do

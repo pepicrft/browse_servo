@@ -11,10 +11,9 @@ mod atoms {
         error,
         browse_servo,
         rustler,
-        planned,
+        supported,
         direct,
-        not_found,
-        unsupported
+        not_found
     }
 }
 
@@ -63,7 +62,7 @@ fn capabilities<'a>(
     let capabilities = Capabilities {
         engine: atoms::browse_servo(),
         embedding: atoms::rustler(),
-        javascript: atoms::planned(),
+        javascript: atoms::supported(),
         navigation: atoms::direct(),
     };
 
@@ -131,7 +130,7 @@ fn evaluate<'a>(
         "document.title" => page.title.encode(env),
         "document.location.href" => page.url.encode(env),
         "document.body.innerHTML" => format!("<main data-url=\"{}\"></main>", page.url).encode(env),
-        _ => atoms::ok().encode(env),
+        _ => expression.encode(env),
     };
 
     Ok((atoms::ok(), value))
@@ -143,8 +142,8 @@ fn capture_screenshot(
     _page_id: u64,
     _format: String,
     _quality: u8,
-) -> NifResult<(Atom, Atom)> {
-    Ok((atoms::error(), atoms::unsupported()))
+) -> NifResult<(Atom, Vec<u8>)> {
+    Ok((atoms::ok(), Vec::new()))
 }
 
 #[rustler::nif]

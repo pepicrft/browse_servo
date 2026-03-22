@@ -46,14 +46,22 @@ defmodule BrowseServo.BrowseBackend do
   end
 
   @impl Browse.Browser
-  def print_to_pdf(_browser, _opts), do: {:error, :unsupported}
+  def print_to_pdf(browser, opts) do
+    Browser.print_to_pdf(browser, opts)
+  end
 
   @impl Browse.Browser
-  def click(_browser, _locator, _opts), do: {:error, :unsupported}
+  def click(browser, locator, opts) do
+    Browser.click(browser, locator, opts)
+  end
 
   @impl Browse.Browser
-  def fill(_browser, _locator, _value, _opts), do: {:error, :unsupported}
+  def fill(browser, locator, value, opts) do
+    Browser.fill(browser, locator, value, opts)
+  end
 
   @impl Browse.Browser
-  def wait_for(_browser, _locator, _opts), do: {:error, :unsupported}
+  def wait_for(browser, locator, opts) do
+    Browser.wait_for(browser, locator, opts)
+  end
 end

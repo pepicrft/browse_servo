@@ -9,7 +9,7 @@ defmodule BrowseServo.TestNative do
      %{
        engine: :browse_servo,
        embedding: :rustler,
-       javascript: :planned,
+       javascript: :supported,
        navigation: :direct
      }}
   end
@@ -22,12 +22,13 @@ defmodule BrowseServo.TestNative do
     {:ok, %{id: page_id, title: "Page for #{url}", url: url}}
   end
 
-  def content(:runtime, _page_id), do: {:ok, "<html><body>stub</body></html>"}
-  def title(:runtime, _page_id), do: {:ok, "Stub Title"}
-  def evaluate(:runtime, _page_id, "document.title"), do: {:ok, "Stub Title"}
-  def evaluate(:runtime, _page_id, _expression), do: {:ok, :unsupported}
+  def content(:runtime, _page_id),
+    do: {:ok, "<html><body><main data-testid=\"content\">content</main></body></html>"}
 
-  def capture_screenshot(:runtime, _page_id, _format, _quality), do: {:error, :unsupported}
+  def title(:runtime, _page_id), do: {:ok, "Example Title"}
+  def evaluate(:runtime, _page_id, expression), do: {:ok, expression}
+
+  def capture_screenshot(:runtime, _page_id, _format, _quality), do: {:ok, <<137, 80, 78, 71>>}
 
   def close_page(:runtime, _page_id), do: :ok
 end

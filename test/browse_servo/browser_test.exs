@@ -19,6 +19,10 @@ defmodule BrowseServo.BrowserTest do
       [:browse_servo, :browser, :new_page, :start],
       [:browse_servo, :browser, :new_page, :stop],
       [:browse_servo, :browser, :capture_screenshot, :stop],
+      [:browse_servo, :browser, :print_to_pdf, :stop],
+      [:browse_servo, :browser, :click, :stop],
+      [:browse_servo, :browser, :fill, :stop],
+      [:browse_servo, :browser, :wait_for, :stop],
       [:browse_servo, :browser, :terminate]
     ]
 
@@ -36,10 +40,7 @@ defmodule BrowseServo.BrowserTest do
 
   test "starts a browser and exposes capabilities" do
     assert {:ok, browser} =
-             Browser.start_link(
-               native_module: BrowseServo.TestNative,
-               screenshot_module: BrowseServo.TestScreenshot
-             )
+             Browser.start_link(native_module: BrowseServo.TestNative)
 
     assert_receive {:telemetry_event, [:browse_servo, :browser, :init, :start], %{system_time: _},
                     %{native_module: _}}
@@ -52,17 +53,14 @@ defmodule BrowseServo.BrowserTest do
               %{
                 embedding: :rustler,
                 engine: :browse_servo,
-                javascript: :planned,
+                javascript: :supported,
                 navigation: :direct
               }}
   end
 
   test "opens pages through the browser process" do
     assert {:ok, browser} =
-             Browser.start_link(
-               native_module: BrowseServo.TestNative,
-               screenshot_module: BrowseServo.TestScreenshot
-             )
+             Browser.start_link(native_module: BrowseServo.TestNative)
 
     assert {:ok, %Page{id: 1, url: "https://example.com"}} =
              Browser.new_page(browser, url: "https://example.com")
@@ -75,16 +73,12 @@ defmodule BrowseServo.BrowserTest do
   end
 
   test "supports browser-level navigation and screenshots" do
-    assert {:ok, browser} =
-             Browser.start_link(
-               native_module: BrowseServo.TestNative,
-               screenshot_module: BrowseServo.TestScreenshot
-             )
+    assert {:ok, browser} = Browser.start_link(native_module: BrowseServo.TestNative)
 
     assert :ok = Browser.navigate(browser, "https://example.com/docs")
     assert {:ok, "https://example.com/docs"} = Browser.current_url(browser)
 
-    assert {:ok, "screenshot:https://example.com/docs:1440x900"} =
+    assert {:ok, <<137, 80, 78, 71>>} =
              Browser.capture_screenshot(browser, width: 1440, height: 900)
 
     assert_receive {:telemetry_event, [:browse_servo, :browser, :navigate, :stop], %{duration: _},
@@ -94,12 +88,30 @@ defmodule BrowseServo.BrowserTest do
                     %{duration: _}, %{status: :ok}}
   end
 
+  test "supports pdf output and browser actions" do
+    assert {:ok, browser} = Browser.start_link(native_module: BrowseServo.TestNative)
+
+    assert :ok = Browser.navigate(browser, "https://example.com/form")
+    assert :ok = Browser.click(browser, "#submit")
+    assert :ok = Browser.fill(browser, "#email", "user@example.com")
+    assert :ok = Browser.wait_for(browser, "#done", timeout: 1_000)
+    assert {:ok, <<>>} = Browser.print_to_pdf(browser)
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :click, :stop], %{duration: _},
+                    %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :fill, :stop], %{duration: _},
+                    %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :wait_for, :stop], %{duration: _},
+                    %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :print_to_pdf, :stop],
+                    %{duration: _}, %{status: :ok}}
+  end
+
   test "emits terminate telemetry when the browser stops" do
-    assert {:ok, browser} =
-             Browser.start_link(
-               native_module: BrowseServo.TestNative,
-               screenshot_module: BrowseServo.TestScreenshot
-             )
+    assert {:ok, browser} = Browser.start_link(native_module: BrowseServo.TestNative)
 
     ref = Process.monitor(browser)
 

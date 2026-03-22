@@ -13,7 +13,6 @@ defmodule BrowseServoTest do
       pool: [
         implementation: BrowseServo.BrowseBackend,
         native_module: BrowseServo.TestNative,
-        screenshot_module: BrowseServo.TestScreenshot,
         pool_size: 1
       ]
     )
