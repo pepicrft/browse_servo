@@ -1,4 +1,4 @@
-defmodule Servox.TestNative do
+defmodule BrowseServo.TestNative do
   @moduledoc false
 
   def new_runtime, do: {:ok, :runtime}
@@ -7,7 +7,7 @@ defmodule Servox.TestNative do
   def capabilities(:runtime) do
     {:ok,
      %{
-       engine: :servox,
+       engine: :browse_servo,
        embedding: :rustler,
        javascript: :planned,
        navigation: :direct

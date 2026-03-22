@@ -1,19 +1,19 @@
-defmodule Servox.Native.Release do
+defmodule BrowseServo.Native.Release do
   @moduledoc false
 
   def base_url(version) do
-    "https://github.com/pepicrft/servox/releases/download/v#{version}"
+    "https://github.com/pepicrft/browse_servo/releases/download/v#{version}"
   end
 end
 
-defmodule Servox.Native do
+defmodule BrowseServo.Native do
   @moduledoc false
 
   use RustlerPrecompiled,
-    otp_app: :servox,
-    crate: "servox_native",
-    base_url: {Servox.Native.Release, :base_url},
-    force_build: System.get_env("SERVOX_BUILD") in ["1", "true"],
+    otp_app: :browse_servo,
+    crate: "browse_servo_native",
+    base_url: {BrowseServo.Native.Release, :base_url},
+    force_build: System.get_env("BROWSE_SERVO_BUILD") in ["1", "true"],
     version: Mix.Project.config()[:version]
 
   def new_runtime, do: :erlang.nif_error(:nif_not_loaded)

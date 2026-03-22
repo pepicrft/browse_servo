@@ -20,9 +20,10 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-servox-*.tar
+browse_servo-*.tar
 
 # Ignore Rust build artifacts.
+native/browse_servo_native/target/
 native/servox_native/target/
 
 # Ignore built NIFs.

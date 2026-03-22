@@ -1,10 +1,10 @@
-defmodule Servox do
+defmodule BrowseServo do
   @moduledoc """
-  Public entrypoint for the Servox browser runtime.
+  Public entrypoint for the BrowseServo browser runtime.
   """
 
-  alias Servox.Browser
-  alias Servox.BrowserPool
+  alias BrowseServo.Browser
+  alias BrowseServo.BrowserPool
 
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -12,7 +12,7 @@ defmodule Servox do
   end
 
   @doc """
-  Builds child specs from pools configured under `:servox`.
+  Builds child specs from pools configured under `:browse_servo`.
   """
   @spec children() :: [Supervisor.child_spec()]
   def children do
@@ -44,7 +44,7 @@ defmodule Servox do
   def checkout(pool, fun, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, 30_000)
 
-    :telemetry.span([:servox, :checkout], %{pool: pool, timeout: timeout}, fn ->
+    :telemetry.span([:browse_servo, :checkout], %{pool: pool, timeout: timeout}, fn ->
       result = BrowserPool.checkout(pool, fun, timeout)
       {result, %{pool: pool, timeout: timeout}}
     end)
@@ -52,11 +52,11 @@ defmodule Servox do
 
   @spec default_pool!() :: NimblePool.pool()
   def default_pool! do
-    Application.fetch_env!(:servox, :default_pool)
+    Application.fetch_env!(:browse_servo, :default_pool)
   end
 
   @spec configured_pools() :: keyword()
   def configured_pools do
-    Application.get_env(:servox, :pools, [])
+    Application.get_env(:browse_servo, :pools, [])
   end
 end

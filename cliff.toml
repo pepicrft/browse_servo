@@ -1,6 +1,6 @@
 [remote.github]
 owner = "pepicrft"
-repo = "servox"
+repo = "browse_servo"
 
 [changelog]
 header = """

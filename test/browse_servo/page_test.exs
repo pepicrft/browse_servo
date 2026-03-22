@@ -1,14 +1,14 @@
-defmodule Servox.PageTest do
+defmodule BrowseServo.PageTest do
   use ExUnit.Case, async: true
 
-  alias Servox.Browser
-  alias Servox.Page
+  alias BrowseServo.Browser
+  alias BrowseServo.Page
 
   setup do
     {:ok, browser} =
       Browser.start_link(
-        native_module: Servox.TestNative,
-        screenshot_module: Servox.TestScreenshot
+        native_module: BrowseServo.TestNative,
+        screenshot_module: BrowseServo.TestScreenshot
       )
 
     {:ok, page} = Browser.new_page(browser, url: "https://example.com")

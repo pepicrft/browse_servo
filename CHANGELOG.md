@@ -5,4 +5,4 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Features
-- Initial Rustler-backed Servox scaffold
+- Initial Rustler-backed BrowseServo scaffold

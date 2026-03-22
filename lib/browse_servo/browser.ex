@@ -1,13 +1,13 @@
-defmodule Servox.Browser do
+defmodule BrowseServo.Browser do
   @moduledoc """
-  Elixir process boundary around the native Servox runtime.
+  Elixir process boundary around the native BrowseServo runtime.
 
-  Telemetry events are emitted under the `[:servox, :browser, ...]` prefix.
+  Telemetry events are emitted under the `[:browse_servo, :browser, ...]` prefix.
   """
 
   use GenServer
 
-  alias Servox.Page
+  alias BrowseServo.Page
 
   @type native_runtime :: term()
   @type page_ref :: %{id: pos_integer(), title: String.t(), url: String.t()}
@@ -81,7 +81,7 @@ defmodule Servox.Browser do
   def init(opts) do
     native = native_module(opts)
 
-    :telemetry.span([:servox, :browser, :init], %{native_module: inspect(native)}, fn ->
+    :telemetry.span([:browse_servo, :browser, :init], %{native_module: inspect(native)}, fn ->
       with {:ok, runtime} <- native.new_runtime(),
            {:ok, attrs} <- native.open_page(runtime, "about:blank") do
         state = %{
@@ -260,9 +260,13 @@ defmodule Servox.Browser do
 
   @impl true
   def terminate(_reason, state) do
-    :telemetry.execute([:servox, :browser, :terminate], %{system_time: System.system_time()}, %{
-      browser: self()
-    })
+    :telemetry.execute(
+      [:browse_servo, :browser, :terminate],
+      %{system_time: System.system_time()},
+      %{
+        browser: self()
+      }
+    )
 
     _ = state.native.shutdown(state.runtime)
     :ok
@@ -282,14 +286,18 @@ defmodule Servox.Browser do
   end
 
   defp native_module(opts) do
-    Keyword.get(opts, :native_module, Application.get_env(:servox, :native_module, Servox.Native))
+    Keyword.get(
+      opts,
+      :native_module,
+      Application.get_env(:browse_servo, :native_module, BrowseServo.Native)
+    )
   end
 
   defp screenshot_module(opts) do
     Keyword.get(
       opts,
       :screenshot_module,
-      Application.get_env(:servox, :screenshot_module, Servox.Screenshot)
+      Application.get_env(:browse_servo, :screenshot_module, BrowseServo.Screenshot)
     )
   end
 
@@ -310,7 +318,7 @@ defmodule Servox.Browser do
   end
 
   defp telemetry_call(event, metadata, fun) do
-    :telemetry.span([:servox, :browser, event], metadata, fn ->
+    :telemetry.span([:browse_servo, :browser, event], metadata, fn ->
       case fun.() do
         {:ok, reply, next_state} ->
           {{reply, next_state}, telemetry_metadata(reply)}
@@ -329,7 +337,7 @@ defmodule Servox.Browser do
   end
 
   defp telemetry_span(event, metadata, fun) do
-    :telemetry.span([:servox, :browser, event], metadata, fn ->
+    :telemetry.span([:browse_servo, :browser, event], metadata, fn ->
       result = fun.()
       {result, telemetry_metadata(result)}
     end)

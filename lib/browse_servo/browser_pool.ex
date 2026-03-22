@@ -1,11 +1,11 @@
-defmodule Servox.BrowserPool do
+defmodule BrowseServo.BrowserPool do
   @moduledoc """
-  Servox-facing compatibility wrapper around `Browse` for pools of warm browser runtimes.
+  BrowseServo-facing compatibility wrapper around `Browse` for pools of warm browser runtimes.
   """
 
   alias Browse
-  alias Servox
-  alias Servox.BrowseBackend
+  alias BrowseServo
+  alias BrowseServo.BrowseBackend
 
   def child_spec(pool) when not is_list(pool) do
     child_spec(pool, [])
@@ -47,7 +47,7 @@ defmodule Servox.BrowserPool do
 
   defp pool_opts(pool, opts) do
     configured_opts =
-      Servox.configured_pools()
+      BrowseServo.configured_pools()
       |> Keyword.get(pool, [])
 
     configured_opts

@@ -1,9 +1,9 @@
-defmodule Servox.BrowseBackend do
+defmodule BrowseServo.BrowseBackend do
   @moduledoc false
 
   @behaviour Browse.Browser
 
-  alias Servox.Browser
+  alias BrowseServo.Browser
 
   @impl Browse.Browser
   def init(opts) do

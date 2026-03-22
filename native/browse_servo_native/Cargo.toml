@@ -1,5 +1,5 @@
 [package]
-name = "servox_native"
+name = "browse_servo_native"
 version = "0.1.0"
 edition = "2021"
 

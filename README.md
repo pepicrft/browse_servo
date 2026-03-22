@@ -1,9 +1,9 @@
-# Servox
+# BrowseServo
 
-Servox is a Rustler-backed Elixir browser runtime for Elixir applications that want
+BrowseServo is a Rustler-backed Elixir browser runtime for Elixir applications that want
 an idiomatic browser API with a native process boundary.
 
-It follows the same shared-interface pattern used by `Chrona`: Servox keeps its own
+It follows the same shared-interface pattern used by `Chrona`: BrowseServo keeps its own
 API and native runtime, while delegating pool management and browser capability
 integration to [`Browse`](https://hex.pm/packages/browse) under the hood.
 
@@ -15,16 +15,16 @@ The architectural boundary is:
 
 ## 🚀 Status
 
-Servox is a working project with a production-ready release pipeline, tested Elixir
+BrowseServo is a working project with a production-ready release pipeline, tested Elixir
 API surface, telemetry instrumentation, and precompiled NIF distribution.
 
 What is included today:
 
-- package/app identity as `servox`
-- Rustler-based native crate under `native/servox_native`
-- `Servox.Browser` as the Elixir process boundary
-- `Servox.BrowseBackend` and `Servox.BrowserPool` as the Browse-backed integration layer
-- `Servox.Page` as the high-level page handle
+- package/app identity as `browse_servo`
+- Rustler-based native crate under `native/browse_servo_native`
+- `BrowseServo.Browser` as the Elixir process boundary
+- `BrowseServo.BrowseBackend` and `BrowseServo.BrowserPool` as the Browse-backed integration layer
+- `BrowseServo.Page` as the high-level page handle
 - telemetry events for browser lifecycle and page operations
 - precompiled-NIF publishing setup via `rustler_precompiled`
 - tests, docs, formatting, and CI scaffolding
@@ -40,7 +40,7 @@ Current implementation notes:
 ```elixir
 def deps do
   [
-    {:servox, "~> 0.1.0-dev"}
+    {:browse_servo, "~> 0.1.0-dev"}
   ]
 end
 ```
@@ -57,74 +57,74 @@ mix setup
 ### Start a browser runtime directly
 
 ```elixir
-{:ok, browser} = Servox.start_link()
+{:ok, browser} = BrowseServo.start_link()
 ```
 
 ### Open and use a page
 
 ```elixir
-{:ok, page} = Servox.Browser.new_page(browser, url: "https://example.com")
-{:ok, page} = Servox.Page.goto(page, "https://example.com/docs")
-{:ok, title} = Servox.Page.title(page)
-{:ok, html} = Servox.Page.content(page)
-{:ok, value} = Servox.Page.evaluate(page, "document.title")
+{:ok, page} = BrowseServo.Browser.new_page(browser, url: "https://example.com")
+{:ok, page} = BrowseServo.Page.goto(page, "https://example.com/docs")
+{:ok, title} = BrowseServo.Page.title(page)
+{:ok, html} = BrowseServo.Page.content(page)
+{:ok, value} = BrowseServo.Page.evaluate(page, "document.title")
 ```
 
 ### Inspect runtime capabilities
 
 ```elixir
-{:ok, caps} = Servox.Browser.capabilities(browser)
+{:ok, caps} = BrowseServo.Browser.capabilities(browser)
 ```
 
 ### Use Browse-backed pools
 
-Configure pools through Servox:
+Configure pools through BrowseServo:
 
 ```elixir
-config :servox,
-  default_pool: MyApp.ServoxPool,
+config :browse_servo,
+  default_pool: MyApp.BrowseServoPool,
   pools: [
-    MyApp.ServoxPool: [pool_size: 2]
+    MyApp.BrowseServoPool: [pool_size: 2]
   ]
 ```
 
 Add the configured pools to your supervision tree:
 
 ```elixir
-children = Servox.children()
+children = BrowseServo.children()
 ```
 
 Or start one pool directly:
 
 ```elixir
 children = [
-  {Servox.BrowserPool, name: MyApp.ServoxPool, pool_size: 2}
+  {BrowseServo.BrowserPool, name: MyApp.BrowseServoPool, pool_size: 2}
 ]
 ```
 
 Check out a warm browser from the pool:
 
 ```elixir
-Servox.checkout(fn browser ->
-  :ok = Servox.Browser.navigate(browser, "https://example.com")
-  Servox.Browser.capture_screenshot(browser, format: "png")
+BrowseServo.checkout(fn browser ->
+  :ok = BrowseServo.Browser.navigate(browser, "https://example.com")
+  BrowseServo.Browser.capture_screenshot(browser, format: "png")
 end)
 ```
 
 ## 🧩 Native Layer
 
-`Servox.Native` uses `RustlerPrecompiled`, so published releases can ship precompiled NIFs and
+`BrowseServo.Native` uses `RustlerPrecompiled`, so published releases can ship precompiled NIFs and
 downstream users do not need Rust installed.
 
 During local development the `0.1.0-dev` version force-builds the NIF from source.
 
-Screenshot capture currently uses a local Chrome/Chromium installation. Servox will
+Screenshot capture currently uses a local Chrome/Chromium installation. BrowseServo will
 look for Chrome in common locations, or you can configure `:chrome_path` / `CHROME_PATH`
 explicitly.
 
 ## 📡 Telemetry
 
-Servox emits telemetry events under the `[:servox, :browser, ...]` prefix for:
+BrowseServo emits telemetry events under the `[:browse_servo, :browser, ...]` prefix for:
 
 - runtime initialization
 - capability inspection

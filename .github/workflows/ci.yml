@@ -1,4 +1,4 @@
-name: servox
+name: browse_servo
 
 on:
   push:
@@ -32,8 +32,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            native/servox_native/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml', 'native/servox_native/Cargo.lock', 'native/servox_native/Cargo.toml') }}
+            native/browse_servo_native/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml', 'native/browse_servo_native/Cargo.lock', 'native/browse_servo_native/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -69,8 +69,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            native/servox_native/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml', 'native/servox_native/Cargo.lock', 'native/servox_native/Cargo.toml') }}
+            native/browse_servo_native/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml', 'native/browse_servo_native/Cargo.lock', 'native/browse_servo_native/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 

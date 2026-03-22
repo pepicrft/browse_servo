@@ -1,12 +1,12 @@
-defmodule Servox.MixProject do
+defmodule BrowseServo.MixProject do
   use Mix.Project
 
   @version "0.1.0-dev"
-  @source_url "https://github.com/pepicrft/servox"
+  @source_url "https://github.com/pepicrft/browse_servo"
 
   def project do
     [
-      app: :servox,
+      app: :browse_servo,
       version: @version,
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
@@ -14,9 +14,9 @@ defmodule Servox.MixProject do
       docs: docs(),
       package: package(),
       aliases: aliases(),
-      description: "Rustler-backed Elixir browser runtime scaffold for Servox",
+      description: "Rustler-backed Elixir browser runtime scaffold for BrowseServo",
       elixirc_paths: elixirc_paths(Mix.env()),
-      name: "Servox",
+      name: "BrowseServo",
       source_url: @source_url
     ]
   end
@@ -46,7 +46,7 @@ defmodule Servox.MixProject do
 
   defp docs do
     [
-      main: "Servox",
+      main: "BrowseServo",
       extras: ["README.md"],
       source_ref: @version,
       source_url: @source_url

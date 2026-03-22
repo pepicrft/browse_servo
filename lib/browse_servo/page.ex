@@ -1,9 +1,9 @@
-defmodule Servox.Page do
+defmodule BrowseServo.Page do
   @moduledoc """
   High-level page handle.
   """
 
-  alias Servox.Browser
+  alias BrowseServo.Browser
 
   @enforce_keys [:browser, :id, :title, :url]
   defstruct [:browser, :id, :title, :url]

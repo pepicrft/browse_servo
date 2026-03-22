@@ -1,4 +1,4 @@
-defmodule Servox.Screenshot do
+defmodule BrowseServo.Screenshot do
   @moduledoc false
 
   @default_width 1280
@@ -43,7 +43,7 @@ defmodule Servox.Screenshot do
     opts
     |> Keyword.get(
       :chrome_path,
-      Application.get_env(:servox, :chrome_path) || System.get_env("CHROME_PATH")
+      Application.get_env(:browse_servo, :chrome_path) || System.get_env("CHROME_PATH")
     )
     |> case do
       nil -> detect_chrome_path()
@@ -79,6 +79,9 @@ defmodule Servox.Screenshot do
   end
 
   defp temp_file_path do
-    Path.join(System.tmp_dir!(), "servox-screenshot-#{System.unique_integer([:positive])}.png")
+    Path.join(
+      System.tmp_dir!(),
+      "browse_servo-screenshot-#{System.unique_integer([:positive])}.png"
+    )
   end
 end

@@ -9,7 +9,7 @@ mod atoms {
     rustler::atoms! {
         ok,
         error,
-        servox,
+        browse_servo,
         rustler,
         planned,
         direct,
@@ -61,7 +61,7 @@ fn capabilities<'a>(
     _runtime: ResourceArc<RuntimeResource>,
 ) -> NifResult<(Atom, Term<'a>)> {
     let capabilities = Capabilities {
-        engine: atoms::servox(),
+        engine: atoms::browse_servo(),
         embedding: atoms::rustler(),
         javascript: atoms::planned(),
         navigation: atoms::direct(),
@@ -196,4 +196,4 @@ fn load(env: Env, _info: Term) -> bool {
     true
 }
 
-rustler::init!("Elixir.Servox.Native", load = load);
+rustler::init!("Elixir.BrowseServo.Native", load = load);

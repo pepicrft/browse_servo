@@ -1,4 +1,4 @@
-defmodule Servox.TestScreenshot do
+defmodule BrowseServo.TestScreenshot do
   @moduledoc false
 
   def capture(url, opts) do

@@ -1,0 +1,113 @@
+defmodule BrowseServo.BrowserTest do
+  use ExUnit.Case, async: true
+
+  alias BrowseServo.Browser
+  alias BrowseServo.Page
+
+  def handle_telemetry(event, measurements, metadata, pid) do
+    send(pid, {:telemetry_event, event, measurements, metadata})
+  end
+
+  setup do
+    test_pid = self()
+    handler_id = "browse_servo-browser-test-#{System.unique_integer([:positive])}"
+
+    events = [
+      [:browse_servo, :browser, :init, :start],
+      [:browse_servo, :browser, :init, :stop],
+      [:browse_servo, :browser, :navigate, :stop],
+      [:browse_servo, :browser, :new_page, :start],
+      [:browse_servo, :browser, :new_page, :stop],
+      [:browse_servo, :browser, :capture_screenshot, :stop],
+      [:browse_servo, :browser, :terminate]
+    ]
+
+    :ok =
+      :telemetry.attach_many(
+        handler_id,
+        events,
+        &__MODULE__.handle_telemetry/4,
+        test_pid
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+    :ok
+  end
+
+  test "starts a browser and exposes capabilities" do
+    assert {:ok, browser} =
+             Browser.start_link(
+               native_module: BrowseServo.TestNative,
+               screenshot_module: BrowseServo.TestScreenshot
+             )
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :init, :start], %{system_time: _},
+                    %{native_module: _}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :init, :stop], %{duration: _},
+                    %{status: :ok}}
+
+    assert Browser.capabilities(browser) ==
+             {:ok,
+              %{
+                embedding: :rustler,
+                engine: :browse_servo,
+                javascript: :planned,
+                navigation: :direct
+              }}
+  end
+
+  test "opens pages through the browser process" do
+    assert {:ok, browser} =
+             Browser.start_link(
+               native_module: BrowseServo.TestNative,
+               screenshot_module: BrowseServo.TestScreenshot
+             )
+
+    assert {:ok, %Page{id: 1, url: "https://example.com"}} =
+             Browser.new_page(browser, url: "https://example.com")
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :new_page, :start],
+                    %{system_time: _}, %{url: "https://example.com"}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :new_page, :stop], %{duration: _},
+                    %{page_id: 1, status: :ok, url: "https://example.com"}}
+  end
+
+  test "supports browser-level navigation and screenshots" do
+    assert {:ok, browser} =
+             Browser.start_link(
+               native_module: BrowseServo.TestNative,
+               screenshot_module: BrowseServo.TestScreenshot
+             )
+
+    assert :ok = Browser.navigate(browser, "https://example.com/docs")
+    assert {:ok, "https://example.com/docs"} = Browser.current_url(browser)
+
+    assert {:ok, "screenshot:https://example.com/docs:1440x900"} =
+             Browser.capture_screenshot(browser, width: 1440, height: 900)
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :navigate, :stop], %{duration: _},
+                    %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :capture_screenshot, :stop],
+                    %{duration: _}, %{status: :ok}}
+  end
+
+  test "emits terminate telemetry when the browser stops" do
+    assert {:ok, browser} =
+             Browser.start_link(
+               native_module: BrowseServo.TestNative,
+               screenshot_module: BrowseServo.TestScreenshot
+             )
+
+    ref = Process.monitor(browser)
+
+    GenServer.stop(browser)
+
+    assert_receive {:DOWN, ^ref, :process, ^browser, :normal}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :terminate], %{system_time: _},
+                    %{browser: _}}
+  end
+end
