@@ -14,18 +14,25 @@ jobs:
 
       - uses: jdx/mise-action@v2
 
-      - name: Cache Mix and Zig
+      - name: Cache Mix
         uses: actions/cache@v4
         with:
           path: |
             deps
             _build
-            ~/.cache/zigler
             ~/.cache/rebar3
             ~/.hex
           key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml') }}
           restore-keys: |
             ${{ runner.os }}-mix-
+
+      - name: Cache Zig
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/zigler
+          key: ${{ runner.os }}-zig-${{ hashFiles('mix.exs', 'mise.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-zig-
 
       - name: Install deps
         run: mix deps.get
