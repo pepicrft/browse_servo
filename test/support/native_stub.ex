@@ -27,8 +27,7 @@ defmodule Servox.TestNative do
   def evaluate(:runtime, _page_id, "document.title"), do: {:ok, "Stub Title"}
   def evaluate(:runtime, _page_id, _expression), do: {:ok, :unsupported}
 
-  def capture_screenshot(:runtime, _page_id, format, quality),
-    do: {:ok, "stub:#{format}:#{quality}"}
+  def capture_screenshot(:runtime, _page_id, _format, _quality), do: {:error, :unsupported}
 
   def close_page(:runtime, _page_id), do: :ok
 end

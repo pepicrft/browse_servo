@@ -33,6 +33,7 @@ Current implementation notes:
 
 - the native layer currently uses an in-memory browser model while the Servo embedding evolves
 - the public Elixir API is stable and designed to carry forward to the Servo-backed runtime
+- rendering-backed features such as real screenshots are not exposed until the native runtime supports them
 
 ## 📦 Installation
 
@@ -106,7 +107,7 @@ Check out a warm browser from the pool:
 ```elixir
 Servox.checkout(fn browser ->
   :ok = Servox.Browser.navigate(browser, "https://example.com")
-  Servox.Browser.capture_screenshot(browser, format: "png")
+  Servox.Browser.current_url(browser)
 end)
 ```
 
@@ -116,6 +117,10 @@ end)
 downstream users do not need Rust installed.
 
 During local development the `0.1.0-dev` version force-builds the NIF from source.
+
+Some browser capability methods are intentionally reported as unsupported until the
+native runtime has a real renderer behind them. In particular, screenshot capture
+does not return image data in the current implementation.
 
 ## 📡 Telemetry
 

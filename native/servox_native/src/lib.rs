@@ -8,11 +8,13 @@ use std::sync::RwLock;
 mod atoms {
     rustler::atoms! {
         ok,
+        error,
         servox,
         rustler,
         planned,
         direct,
-        not_found
+        not_found,
+        unsupported
     }
 }
 
@@ -137,17 +139,12 @@ fn evaluate<'a>(
 
 #[rustler::nif]
 fn capture_screenshot(
-    runtime: ResourceArc<RuntimeResource>,
-    page_id: u64,
-    format: String,
-    quality: u8,
-) -> NifResult<(Atom, String)> {
-    let page = find_page(&runtime, page_id)?;
-
-    Ok((
-        atoms::ok(),
-        format!("servox-screenshot:{}:{}:{}", format, quality, page.url),
-    ))
+    _runtime: ResourceArc<RuntimeResource>,
+    _page_id: u64,
+    _format: String,
+    _quality: u8,
+) -> NifResult<(Atom, Atom)> {
+    Ok((atoms::error(), atoms::unsupported()))
 }
 
 #[rustler::nif]
