@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  precompile-native:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-linux-gnu }
+          - { os: ubuntu-latest, target: aarch64-linux-gnu }
+          - { os: macos-latest, target: x86_64-macos-none }
+          - { os: macos-latest, target: aarch64-macos-none }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Install deps
+        run: mix deps.get
+
+      - name: Build NIF
+        run: ZIGLER_PRECOMPILING=${{ matrix.target }} mix compile
+
+      - name: Package artifact
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          MODULE="Elixir.Lightpanda.Native"
+          EXT=".so"
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            EXT=".dll"
+          fi
+          mkdir -p artifacts
+          cp priv/lib/*"${EXT}" "artifacts/"
+          cd artifacts
+          tar czf "${MODULE}-v${VERSION}-${{ matrix.target }}${EXT}.tar.gz" *"${EXT}"
+
+      - name: Upload NIF artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.tar.gz
+
+  changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@v2
+
+      - name: Generate changelog
+        run: git-cliff --config cliff.toml --tag "${GITHUB_REF#refs/tags/v}" > CHANGELOG.md
+
+      - name: Publish release notes
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.md
