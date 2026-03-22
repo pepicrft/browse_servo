@@ -10,6 +10,7 @@ defmodule Servox.Browser do
   alias Servox.Page
 
   @type native_runtime :: term()
+  @type page_ref :: %{id: pos_integer(), title: String.t(), url: String.t()}
 
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -19,6 +20,16 @@ defmodule Servox.Browser do
   @spec capabilities(pid()) :: {:ok, map()} | {:error, term()}
   def capabilities(browser) do
     GenServer.call(browser, :capabilities)
+  end
+
+  @spec current_url(pid()) :: {:ok, String.t()} | {:error, term()}
+  def current_url(browser) do
+    GenServer.call(browser, :current_url)
+  end
+
+  @spec navigate(pid(), String.t()) :: :ok | {:error, term()}
+  def navigate(browser, url) when is_binary(url) do
+    GenServer.call(browser, {:navigate, url})
   end
 
   @spec new_page(pid(), keyword()) :: {:ok, Page.t()} | {:error, term()}
@@ -31,6 +42,11 @@ defmodule Servox.Browser do
     GenServer.call(browser, {:goto, page.id, url})
   end
 
+  @spec content(pid()) :: {:ok, String.t()} | {:error, term()}
+  def content(browser) do
+    GenServer.call(browser, :content)
+  end
+
   @spec content(pid(), Page.t()) :: {:ok, String.t()} | {:error, term()}
   def content(browser, %Page{} = page) do
     GenServer.call(browser, {:content, page.id})
@@ -41,9 +57,19 @@ defmodule Servox.Browser do
     GenServer.call(browser, {:title, page.id})
   end
 
+  @spec evaluate(pid(), String.t()) :: {:ok, term()} | {:error, term()}
+  def evaluate(browser, expression) when is_binary(expression) do
+    GenServer.call(browser, {:evaluate, expression})
+  end
+
   @spec evaluate(pid(), Page.t(), String.t()) :: {:ok, term()} | {:error, term()}
   def evaluate(browser, %Page{} = page, expression) when is_binary(expression) do
     GenServer.call(browser, {:evaluate, page.id, expression})
+  end
+
+  @spec capture_screenshot(pid(), keyword()) :: {:ok, binary()} | {:error, term()}
+  def capture_screenshot(browser, opts \\ []) do
+    GenServer.call(browser, {:capture_screenshot, opts})
   end
 
   @spec close_page(pid(), Page.t()) :: :ok | {:error, term()}
@@ -56,12 +82,16 @@ defmodule Servox.Browser do
     native = native_module(opts)
 
     :telemetry.span([:servox, :browser, :init], %{native_module: inspect(native)}, fn ->
-      case native.new_runtime() do
-        {:ok, runtime} ->
-          {{:ok, %{native: native, runtime: runtime}}, %{status: :ok}}
-
+      with {:ok, runtime} <- native.new_runtime(),
+           {:ok, attrs} <- native.open_page(runtime, "about:blank") do
+        state = %{native: native, runtime: runtime, current_page: page_ref(attrs)}
+        {{:ok, state}, %{status: :ok, page_id: state.current_page.id, url: state.current_page.url}}
+      else
         {:error, reason} ->
           {{:stop, reason}, %{status: :error, reason: reason}}
+
+        other ->
+          {{:stop, other}, %{status: :error, reason: other}}
       end
     end)
   end
@@ -76,25 +106,65 @@ defmodule Servox.Browser do
     {:reply, reply, state}
   end
 
-  def handle_call({:new_page, opts}, _from, state) do
-    url = Keyword.get(opts, :url, "about:blank")
+  def handle_call(:current_url, _from, state) do
+    {:reply, {:ok, state.current_page.url}, state}
+  end
 
-    reply =
-      telemetry_span(:new_page, %{browser: self(), url: url}, fn ->
-        with {:ok, attrs} <- state.native.open_page(state.runtime, url) do
-          {:ok, page_from_attrs(self(), attrs)}
+  def handle_call({:navigate, url}, _from, state) do
+    page_id = state.current_page.id
+
+    {reply, next_state} =
+      telemetry_call(:navigate, %{browser: self(), page_id: page_id, url: url}, fn ->
+        case state.native.navigate(state.runtime, page_id, url) do
+          {:ok, attrs} ->
+            {:ok, :ok, %{state | current_page: page_ref(attrs)}}
+
+          {:error, reason} ->
+            {:error, reason, state}
         end
       end)
 
-    {:reply, reply, state}
+    {:reply, reply, next_state}
+  end
+
+  def handle_call({:new_page, opts}, _from, state) do
+    url = Keyword.get(opts, :url, "about:blank")
+
+    {reply, next_state} =
+      telemetry_call(:new_page, %{browser: self(), url: url}, fn ->
+        case state.native.open_page(state.runtime, url) do
+          {:ok, attrs} ->
+            page = page_from_attrs(self(), attrs)
+            {:ok, {:ok, page}, %{state | current_page: page_ref(attrs)}}
+
+          {:error, reason} ->
+            {:error, reason, state}
+        end
+      end)
+
+    {:reply, reply, next_state}
   end
 
   def handle_call({:goto, page_id, url}, _from, state) do
-    reply =
-      telemetry_span(:goto, %{browser: self(), page_id: page_id, url: url}, fn ->
-        with {:ok, attrs} <- state.native.navigate(state.runtime, page_id, url) do
-          {:ok, page_from_attrs(self(), attrs)}
+    {reply, next_state} =
+      telemetry_call(:goto, %{browser: self(), page_id: page_id, url: url}, fn ->
+        case state.native.navigate(state.runtime, page_id, url) do
+          {:ok, attrs} ->
+            page = page_from_attrs(self(), attrs)
+            {:ok, {:ok, page}, maybe_update_current_page(state, page_id, attrs)}
+
+          {:error, reason} ->
+            {:error, reason, state}
         end
+      end)
+
+    {:reply, reply, next_state}
+  end
+
+  def handle_call(:content, _from, state) do
+    reply =
+      telemetry_span(:content, %{browser: self(), page_id: state.current_page.id}, fn ->
+        state.native.content(state.runtime, state.current_page.id)
       end)
 
     {:reply, reply, state}
@@ -118,6 +188,23 @@ defmodule Servox.Browser do
     {:reply, reply, state}
   end
 
+  def handle_call({:evaluate, expression}, _from, state) do
+    reply =
+      telemetry_span(
+        :evaluate,
+        %{
+          browser: self(),
+          page_id: state.current_page.id,
+          expression_length: byte_size(expression)
+        },
+        fn ->
+          state.native.evaluate(state.runtime, state.current_page.id, expression)
+        end
+      )
+
+    {:reply, reply, state}
+  end
+
   def handle_call({:evaluate, page_id, expression}, _from, state) do
     reply =
       telemetry_span(
@@ -131,13 +218,38 @@ defmodule Servox.Browser do
     {:reply, reply, state}
   end
 
-  def handle_call({:close_page, page_id}, _from, state) do
+  def handle_call({:capture_screenshot, opts}, _from, state) do
+    format = Keyword.get(opts, :format, "png")
+    quality = Keyword.get(opts, :quality, 90)
+
     reply =
-      telemetry_span(:close_page, %{browser: self(), page_id: page_id}, fn ->
-        state.native.close_page(state.runtime, page_id)
-      end)
+      telemetry_span(
+        :capture_screenshot,
+        %{browser: self(), format: format, page_id: state.current_page.id, quality: quality},
+        fn ->
+          state.native.capture_screenshot(state.runtime, state.current_page.id, format, quality)
+        end
+      )
 
     {:reply, reply, state}
+  end
+
+  def handle_call({:close_page, page_id}, _from, state) do
+    {reply, next_state} =
+      telemetry_call(:close_page, %{browser: self(), page_id: page_id}, fn ->
+        case state.native.close_page(state.runtime, page_id) do
+          :ok ->
+            {:ok, :ok, maybe_clear_current_page(state, page_id)}
+
+          {:error, reason} ->
+            {:error, reason, state}
+
+          other ->
+            {:ok, other, state}
+        end
+      end)
+
+    {:reply, reply, next_state}
   end
 
   @impl true
@@ -159,8 +271,40 @@ defmodule Servox.Browser do
     }
   end
 
+  defp page_ref(attrs) do
+    %{id: Map.fetch!(attrs, :id), title: Map.fetch!(attrs, :title), url: Map.fetch!(attrs, :url)}
+  end
+
   defp native_module(opts) do
     Keyword.get(opts, :native_module, Application.get_env(:servox, :native_module, Servox.Native))
+  end
+
+  defp maybe_update_current_page(state, page_id, attrs) do
+    if state.current_page.id == page_id do
+      %{state | current_page: page_ref(attrs)}
+    else
+      state
+    end
+  end
+
+  defp maybe_clear_current_page(state, page_id) do
+    if state.current_page.id == page_id do
+      %{state | current_page: %{id: 0, title: "", url: "about:blank"}}
+    else
+      state
+    end
+  end
+
+  defp telemetry_call(event, metadata, fun) do
+    :telemetry.span([:servox, :browser, event], metadata, fn ->
+      case fun.() do
+        {:ok, reply, next_state} ->
+          {{reply, next_state}, telemetry_metadata(reply)}
+
+        {:error, reason, next_state} ->
+          {{{:error, reason}, next_state}, telemetry_metadata({:error, reason})}
+      end
+    end)
   end
 
   defp telemetry_span(event, metadata, fun) do
@@ -183,5 +327,6 @@ defmodule Servox.Browser do
   defp summarize(value) when is_map(value), do: %{type: :map, size: map_size(value)}
   defp summarize(value) when is_list(value), do: %{type: :list, size: length(value)}
   defp summarize(value) when is_tuple(value), do: %{type: :tuple, size: tuple_size(value)}
+  defp summarize(value) when is_atom(value), do: %{type: :atom, value: value}
   defp summarize(value), do: %{type: value}
 end

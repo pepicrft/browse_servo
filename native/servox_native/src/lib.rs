@@ -136,6 +136,21 @@ fn evaluate<'a>(
 }
 
 #[rustler::nif]
+fn capture_screenshot(
+    runtime: ResourceArc<RuntimeResource>,
+    page_id: u64,
+    format: String,
+    quality: u8,
+) -> NifResult<(Atom, String)> {
+    let page = find_page(&runtime, page_id)?;
+
+    Ok((
+        atoms::ok(),
+        format!("servox-screenshot:{}:{}:{}", format, quality, page.url),
+    ))
+}
+
+#[rustler::nif]
 fn close_page(runtime: ResourceArc<RuntimeResource>, page_id: u64) -> NifResult<Atom> {
     runtime
         .pages

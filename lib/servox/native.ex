@@ -24,5 +24,9 @@ defmodule Servox.Native do
   def content(_runtime, _page_id), do: :erlang.nif_error(:nif_not_loaded)
   def title(_runtime, _page_id), do: :erlang.nif_error(:nif_not_loaded)
   def evaluate(_runtime, _page_id, _expression), do: :erlang.nif_error(:nif_not_loaded)
+
+  def capture_screenshot(_runtime, _page_id, _format, _quality),
+    do: :erlang.nif_error(:nif_not_loaded)
+
   def close_page(_runtime, _page_id), do: :erlang.nif_error(:nif_not_loaded)
 end

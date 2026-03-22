@@ -3,6 +3,10 @@
 Servox is a Rustler-backed Elixir browser runtime for Elixir applications that want
 an idiomatic browser API with a native process boundary.
 
+It follows the same shared-interface pattern used by `Chrona`: Servox keeps its own
+API and native runtime, while delegating pool management and browser capability
+integration to [`Browse`](https://hex.pm/packages/browse) under the hood.
+
 The architectural boundary is:
 
 - an Elixir `GenServer` owns the browser runtime
@@ -19,6 +23,7 @@ What is included today:
 - package/app identity as `servox`
 - Rustler-based native crate under `native/servox_native`
 - `Servox.Browser` as the Elixir process boundary
+- `Servox.BrowseBackend` and `Servox.BrowserPool` as the Browse-backed integration layer
 - `Servox.Page` as the high-level page handle
 - telemetry events for browser lifecycle and page operations
 - precompiled-NIF publishing setup via `rustler_precompiled`
@@ -48,7 +53,7 @@ mix setup
 
 ## 🧭 Usage
 
-### Start a browser runtime
+### Start a browser runtime directly
 
 ```elixir
 {:ok, browser} = Servox.start_link()
@@ -68,6 +73,41 @@ mix setup
 
 ```elixir
 {:ok, caps} = Servox.Browser.capabilities(browser)
+```
+
+### Use Browse-backed pools
+
+Configure pools through Servox:
+
+```elixir
+config :servox,
+  default_pool: MyApp.ServoxPool,
+  pools: [
+    MyApp.ServoxPool: [pool_size: 2]
+  ]
+```
+
+Add the configured pools to your supervision tree:
+
+```elixir
+children = Servox.children()
+```
+
+Or start one pool directly:
+
+```elixir
+children = [
+  {Servox.BrowserPool, name: MyApp.ServoxPool, pool_size: 2}
+]
+```
+
+Check out a warm browser from the pool:
+
+```elixir
+Servox.checkout(fn browser ->
+  :ok = Servox.Browser.navigate(browser, "https://example.com")
+  Servox.Browser.capture_screenshot(browser, format: "png")
+end)
 ```
 
 ## 🧩 Native Layer

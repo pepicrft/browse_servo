@@ -18,13 +18,17 @@ defmodule Servox.TestNative do
     {:ok, %{id: 1, title: "Page for #{url}", url: url}}
   end
 
-  def navigate(:runtime, 1, url) do
-    {:ok, %{id: 1, title: "Page for #{url}", url: url}}
+  def navigate(:runtime, page_id, url) do
+    {:ok, %{id: page_id, title: "Page for #{url}", url: url}}
   end
 
-  def content(:runtime, 1), do: {:ok, "<html><body>stub</body></html>"}
-  def title(:runtime, 1), do: {:ok, "Stub Title"}
-  def evaluate(:runtime, 1, "document.title"), do: {:ok, "Stub Title"}
-  def evaluate(:runtime, 1, _expression), do: {:ok, :unsupported}
-  def close_page(:runtime, 1), do: :ok
+  def content(:runtime, _page_id), do: {:ok, "<html><body>stub</body></html>"}
+  def title(:runtime, _page_id), do: {:ok, "Stub Title"}
+  def evaluate(:runtime, _page_id, "document.title"), do: {:ok, "Stub Title"}
+  def evaluate(:runtime, _page_id, _expression), do: {:ok, :unsupported}
+
+  def capture_screenshot(:runtime, _page_id, format, quality),
+    do: {:ok, "stub:#{format}:#{quality}"}
+
+  def close_page(:runtime, _page_id), do: :ok
 end
