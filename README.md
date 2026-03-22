@@ -81,13 +81,21 @@ The repository includes:
 
 - `git-cliff` configuration in `cliff.toml`
 - CI checks for tests, warning-free compilation, and formatting
-- a release workflow scaffold for publishing precompiled Rustler NIFs
+- a `Release` workflow that builds precompiled NIFs for Linux, macOS, and Windows
+- checksum generation for `RustlerPrecompiled`
+- atomic git push of the release commit and tag with `git push --atomic`
 
-Before the first real Hex release, generate and commit the checksum file:
+The release workflow is triggered manually from GitHub Actions and accepts a semver
+version like `0.1.0`.
 
-```bash
-mix rustler_precompiled.download Servox.Native --all --print
-```
+Release flow:
+
+1. Build all NIF archives for the configured targets.
+2. Generate the checksum file included in the Hex package.
+3. Update `mix.exs` and `CHANGELOG.md`.
+4. Commit the release metadata and push the release branch plus `v<version>` atomically.
+5. Publish the Hex package.
+6. Create the GitHub release with the built NIF archives.
 
 ## License
 

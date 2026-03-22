@@ -1,20 +1,74 @@
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the `v` prefix
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF_TYPE}" != "branch" ]; then
+            echo "Releases must be started from a branch ref." >&2
+            exit 1
+          fi
+
+          version="${{ inputs.version }}"
+
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $version" >&2
+            exit 1
+          fi
+
+          tag="v${version}"
+
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag already exists: $tag" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   precompile-native:
+    needs: prepare
     runs-on: ${{ matrix.os }}
+    name: NIF ${{ matrix.target }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
-          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, use-cross: false }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, use-cross: true }
+          - { os: ubuntu-latest, target: aarch64-unknown-linux-gnu, use-cross: true }
+          - { os: macos-14, target: aarch64-apple-darwin, use-cross: false }
+          - { os: macos-13, target: x86_64-apple-darwin, use-cross: false }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, use-cross: false }
 
     steps:
       - uses: actions/checkout@v4
@@ -49,27 +103,33 @@ jobs:
       - name: Install deps
         run: mix deps.get
 
-      - name: Build NIF
-        run: MIX_ENV=prod RUSTLER_TARGET=${{ matrix.target }} mix compile
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
 
-      - name: Package artifact
-        run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          mkdir -p artifacts
-          find _build/prod/lib/servox/priv/native -type f | while read -r file; do
-            base="$(basename "$file")"
-            cp "$file" "artifacts/$base"
-          done
-          cd artifacts
-          tar czf "Elixir.Servox.Native-v${VERSION}-${{ matrix.target }}.tar.gz" *
+      - name: Build NIF archive
+        id: build
+        uses: philss/rustler-precompiled-action@v1.1.4
+        with:
+          project-name: servox_native
+          project-version: ${{ needs.prepare.outputs.version }}
+          target: ${{ matrix.target }}
+          nif-version: "2.15"
+          use-cross: ${{ matrix.use-cross }}
+          project-dir: native/servox_native
 
       - name: Upload NIF artifact
-        uses: softprops/action-gh-release@v2
+        uses: actions/upload-artifact@v4
         with:
-          files: artifacts/*.tar.gz
+          name: ${{ steps.build.outputs.file-name }}
+          path: ${{ steps.build.outputs.file-path }}
+          if-no-files-found: error
 
-  changelog:
+  publish:
+    needs: [prepare, precompile-native]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -78,10 +138,107 @@ jobs:
 
       - uses: jdx/mise-action@v2
 
-      - name: Generate changelog
-        run: git-cliff --config cliff.toml --tag "${GITHUB_REF#refs/tags/v}" > CHANGELOG.md
-
-      - name: Publish release notes
-        uses: softprops/action-gh-release@v2
+      - name: Cache Mix
+        uses: actions/cache@v4
         with:
-          body_path: CHANGELOG.md
+          path: |
+            deps
+            _build
+            ~/.cache/rebar3
+            ~/.hex
+          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/servox_native/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml', 'native/servox_native/Cargo.lock', 'native/servox_native/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install deps
+        run: mix deps.get
+
+      - name: Download NIF artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Generate changelog
+        shell: bash
+        run: |
+          git-cliff --config cliff.toml --tag "${{ needs.prepare.outputs.tag }}" > CHANGELOG.md
+          git-cliff --config cliff.toml --tag "${{ needs.prepare.outputs.tag }}" --strip all > RELEASE_NOTES.md
+
+      - name: Update package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.prepare.outputs.version }}"
+          perl -0pi -e 's/@version "[^"]+"/@version "'"$version"'"/' mix.exs
+
+      - name: Generate checksum file
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="checksum-Elixir.Servox.Native.exs"
+          {
+            echo "%{"
+            find release-artifacts -maxdepth 1 -type f -name '*.tar.gz' -print0 | sort -z | while IFS= read -r -d '' file; do
+              name="$(basename "$file")"
+              hash="$(sha256sum "$file" | awk '{print $1}')"
+              printf '  "%s" => "sha256:%s",\n' "$name" "$hash"
+            done
+            echo "}"
+          } > "$output"
+
+      - name: Validate Hex package
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_dir="$(mktemp -d)"
+          mix hex.build --unpack -o "$build_dir"
+
+      - name: Commit release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mix.exs CHANGELOG.md checksum-Elixir.Servox.Native.exs
+          git commit -m "Release ${{ needs.prepare.outputs.tag }}"
+          git tag -a "${{ needs.prepare.outputs.tag }}" -m "${{ needs.prepare.outputs.tag }}"
+
+      - name: Push release commit and tag atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push --atomic origin "HEAD:${GITHUB_REF_NAME}" "refs/tags/${{ needs.prepare.outputs.tag }}"
+
+      - name: Publish Hex package
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${HEX_API_KEY:?HEX_API_KEY secret is required}"
+          mix hex.publish package --yes
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${{ needs.prepare.outputs.tag }}" \
+            release-artifacts/*.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "${{ needs.prepare.outputs.tag }}" \
+            --notes-file RELEASE_NOTES.md
