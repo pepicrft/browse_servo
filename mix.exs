@@ -1,12 +1,12 @@
-defmodule Lightpanda.MixProject do
+defmodule Servox.MixProject do
   use Mix.Project
 
   @version "0.1.0-dev"
-  @source_url "https://github.com/pepicrft/lightpanda"
+  @source_url "https://github.com/pepicrft/servox"
 
   def project do
     [
-      app: :lightpanda,
+      app: :servox,
       version: @version,
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
@@ -14,17 +14,17 @@ defmodule Lightpanda.MixProject do
       docs: docs(),
       package: package(),
       aliases: aliases(),
-      description: "Elixir-native wrapper around the Lightpanda browser",
+      description: "Rustler-backed Elixir browser runtime scaffold for Servox",
       elixirc_paths: elixirc_paths(Mix.env()),
-      name: "Lightpanda",
+      name: "Servox",
       source_url: @source_url
     ]
   end
 
   def application do
     [
-      extra_applications: [:crypto, :logger],
-      mod: {Lightpanda.Application, []}
+      extra_applications: [:logger],
+      mod: {Servox.Application, []}
     ]
   end
 
@@ -33,14 +33,11 @@ defmodule Lightpanda.MixProject do
 
   defp deps do
     [
-      {:jason, "~> 1.4"},
-      {:req, "~> 0.5.17"},
-      {:websockex, "~> 0.5.1"},
-      {:zigler_precompiled, "~> 0.1.2"},
-      {:zigler, "~> 0.15.2", optional: true, runtime: false},
+      {:rustler_precompiled, "~> 0.8.4"},
+      {:rustler, "~> 0.37.3", optional: true},
       {:mimic, "~> 2.3", only: :test},
       {:quokka, "~> 2.12", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.38", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
@@ -48,7 +45,7 @@ defmodule Lightpanda.MixProject do
 
   defp docs do
     [
-      main: "Lightpanda",
+      main: "Servox",
       extras: ["README.md"],
       source_ref: @version,
       source_url: @source_url
@@ -75,7 +72,7 @@ defmodule Lightpanda.MixProject do
 
   defp aliases do
     [
-      setup: ["deps.get", "zig.get"],
+      setup: ["deps.get"],
       lint: ["format --check-formatted", "credo --strict"],
       test: ["test"]
     ]

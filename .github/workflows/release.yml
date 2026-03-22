@@ -13,10 +13,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: ubuntu-latest, target: x86_64-linux-gnu }
-          - { os: ubuntu-latest, target: aarch64-linux-gnu }
-          - { os: macos-latest, target: x86_64-macos-none }
-          - { os: macos-latest, target: aarch64-macos-none }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: macos-latest, target: aarch64-apple-darwin }
 
     steps:
       - uses: actions/checkout@v4
@@ -36,39 +34,34 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-mix-
             ${{ runner.os }}-mix-
 
-      - name: Cache Zig
+      - name: Cache Cargo
         uses: actions/cache@v4
         with:
-          path: ~/.cache/zigler
-          key: ${{ runner.os }}-zig-${{ hashFiles('mix.exs', 'mise.toml') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/servox_native/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml', 'native/servox_native/Cargo.lock', 'native/servox_native/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-zig-
-
-      - uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.15.2
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
+            ${{ runner.os }}-cargo-
 
       - name: Install deps
         run: mix deps.get
 
-      - name: Install Zig
-        run: mix zig.get
-
       - name: Build NIF
-        run: ZIGLER_PRECOMPILING=${{ matrix.target }} mix compile
+        run: MIX_ENV=prod RUSTLER_TARGET=${{ matrix.target }} mix compile
 
       - name: Package artifact
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
-          MODULE="Elixir.Lightpanda.Native"
-          EXT=".so"
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
-            EXT=".dll"
-          fi
           mkdir -p artifacts
-          cp priv/lib/*"${EXT}" "artifacts/"
+          find _build/prod/lib/servox/priv/native -type f | while read -r file; do
+            base="$(basename "$file")"
+            cp "$file" "artifacts/$base"
+          done
           cd artifacts
-          tar czf "${MODULE}-v${VERSION}-${{ matrix.target }}${EXT}.tar.gz" *"${EXT}"
+          tar czf "Elixir.Servox.Native-v${VERSION}-${{ matrix.target }}.tar.gz" *
 
       - name: Upload NIF artifact
         uses: softprops/action-gh-release@v2

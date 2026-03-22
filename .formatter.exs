@@ -1,8 +1,8 @@
 [
-  import_deps: [:quokka, :zigler],
+  import_deps: [:quokka],
   inputs: ~w[
     {mix,.formatter,.credo}.exs
-    {config,lib,native,test}/**/*.{ex,exs,zig}
+    {config,lib,test}/**/*.{ex,exs}
   ],
-  plugins: [Quokka, Zig.Formatter]
+  plugins: [Quokka]
 ]

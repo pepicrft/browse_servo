@@ -20,5 +20,10 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-lightpanda-*.tar
+servox-*.tar
 
+# Ignore Rust build artifacts.
+native/servox_native/target/
+
+# Ignore built NIFs.
+priv/native/
