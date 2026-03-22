@@ -84,7 +84,13 @@ defmodule Servox.Browser do
     :telemetry.span([:servox, :browser, :init], %{native_module: inspect(native)}, fn ->
       with {:ok, runtime} <- native.new_runtime(),
            {:ok, attrs} <- native.open_page(runtime, "about:blank") do
-        state = %{native: native, runtime: runtime, current_page: page_ref(attrs)}
+        state = %{
+          native: native,
+          runtime: runtime,
+          current_page: page_ref(attrs),
+          screenshot_module: screenshot_module(opts)
+        }
+
         {{:ok, state}, %{status: :ok, page_id: state.current_page.id, url: state.current_page.url}}
       else
         {:error, reason} ->
@@ -227,7 +233,7 @@ defmodule Servox.Browser do
         :capture_screenshot,
         %{browser: self(), format: format, page_id: state.current_page.id, quality: quality},
         fn ->
-          state.native.capture_screenshot(state.runtime, state.current_page.id, format, quality)
+          perform_capture_screenshot(state, opts)
         end
       )
 
@@ -279,6 +285,14 @@ defmodule Servox.Browser do
     Keyword.get(opts, :native_module, Application.get_env(:servox, :native_module, Servox.Native))
   end
 
+  defp screenshot_module(opts) do
+    Keyword.get(
+      opts,
+      :screenshot_module,
+      Application.get_env(:servox, :screenshot_module, Servox.Screenshot)
+    )
+  end
+
   defp maybe_update_current_page(state, page_id, attrs) do
     if state.current_page.id == page_id do
       %{state | current_page: page_ref(attrs)}
@@ -305,6 +319,13 @@ defmodule Servox.Browser do
           {{{:error, reason}, next_state}, telemetry_metadata({:error, reason})}
       end
     end)
+  end
+
+  defp perform_capture_screenshot(
+         %{current_page: %{url: url}, screenshot_module: screenshot_module},
+         opts
+       ) do
+    screenshot_module.capture(url, opts)
   end
 
   defp telemetry_span(event, metadata, fun) do

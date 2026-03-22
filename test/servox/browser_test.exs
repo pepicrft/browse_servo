@@ -18,6 +18,7 @@ defmodule Servox.BrowserTest do
       [:servox, :browser, :navigate, :stop],
       [:servox, :browser, :new_page, :start],
       [:servox, :browser, :new_page, :stop],
+      [:servox, :browser, :capture_screenshot, :stop],
       [:servox, :browser, :terminate]
     ]
 
@@ -34,7 +35,11 @@ defmodule Servox.BrowserTest do
   end
 
   test "starts a browser and exposes capabilities" do
-    assert {:ok, browser} = Browser.start_link(native_module: Servox.TestNative)
+    assert {:ok, browser} =
+             Browser.start_link(
+               native_module: Servox.TestNative,
+               screenshot_module: Servox.TestScreenshot
+             )
 
     assert_receive {:telemetry_event, [:servox, :browser, :init, :start], %{system_time: _},
                     %{native_module: _}}
@@ -48,7 +53,11 @@ defmodule Servox.BrowserTest do
   end
 
   test "opens pages through the browser process" do
-    assert {:ok, browser} = Browser.start_link(native_module: Servox.TestNative)
+    assert {:ok, browser} =
+             Browser.start_link(
+               native_module: Servox.TestNative,
+               screenshot_module: Servox.TestScreenshot
+             )
 
     assert {:ok, %Page{id: 1, url: "https://example.com"}} =
              Browser.new_page(browser, url: "https://example.com")
@@ -60,19 +69,33 @@ defmodule Servox.BrowserTest do
                     %{page_id: 1, status: :ok, url: "https://example.com"}}
   end
 
-  test "supports browser-level navigation" do
-    assert {:ok, browser} = Browser.start_link(native_module: Servox.TestNative)
+  test "supports browser-level navigation and screenshots" do
+    assert {:ok, browser} =
+             Browser.start_link(
+               native_module: Servox.TestNative,
+               screenshot_module: Servox.TestScreenshot
+             )
 
     assert :ok = Browser.navigate(browser, "https://example.com/docs")
     assert {:ok, "https://example.com/docs"} = Browser.current_url(browser)
-    assert {:error, :unsupported} = Browser.capture_screenshot(browser, format: "jpeg", quality: 75)
+
+    assert {:ok, "screenshot:https://example.com/docs:1440x900"} =
+             Browser.capture_screenshot(browser, width: 1440, height: 900)
 
     assert_receive {:telemetry_event, [:servox, :browser, :navigate, :stop], %{duration: _},
                     %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:servox, :browser, :capture_screenshot, :stop],
+                    %{duration: _}, %{status: :ok}}
   end
 
   test "emits terminate telemetry when the browser stops" do
-    assert {:ok, browser} = Browser.start_link(native_module: Servox.TestNative)
+    assert {:ok, browser} =
+             Browser.start_link(
+               native_module: Servox.TestNative,
+               screenshot_module: Servox.TestScreenshot
+             )
+
     ref = Process.monitor(browser)
 
     GenServer.stop(browser)

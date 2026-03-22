@@ -21,8 +21,6 @@ defmodule Servox.NativeTest do
     assert {:ok, "Page for https://example.com"} =
              Servox.Native.evaluate(runtime, page.id, "document.title")
 
-    assert {:error, :unsupported} = Servox.Native.capture_screenshot(runtime, page.id, "png", 90)
-
     assert :ok = Servox.Native.close_page(runtime, page.id)
     assert :ok = Servox.Native.shutdown(runtime)
   end

@@ -5,7 +5,12 @@ defmodule Servox.PageTest do
   alias Servox.Page
 
   setup do
-    {:ok, browser} = Browser.start_link(native_module: Servox.TestNative)
+    {:ok, browser} =
+      Browser.start_link(
+        native_module: Servox.TestNative,
+        screenshot_module: Servox.TestScreenshot
+      )
+
     {:ok, page} = Browser.new_page(browser, url: "https://example.com")
     %{page: page}
   end

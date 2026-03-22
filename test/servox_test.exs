@@ -10,7 +10,12 @@ defmodule ServoxTest do
     Application.put_env(:servox, :default_pool, :pool)
 
     Application.put_env(:servox, :pools,
-      pool: [implementation: Servox.BrowseBackend, native_module: Servox.TestNative, pool_size: 1]
+      pool: [
+        implementation: Servox.BrowseBackend,
+        native_module: Servox.TestNative,
+        screenshot_module: Servox.TestScreenshot,
+        pool_size: 1
+      ]
     )
 
     on_exit(fn ->
