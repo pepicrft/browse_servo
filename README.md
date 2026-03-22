@@ -19,6 +19,7 @@ What is implemented already:
 - Rustler-based native crate under `native/servox_native`
 - `Servox.Browser` as the Elixir process boundary
 - `Servox.Page` as the high-level page handle
+- telemetry events for browser lifecycle and page operations
 - precompiled-NIF publishing setup via `rustler_precompiled`
 - tests, docs, formatting, and CI scaffolding
 

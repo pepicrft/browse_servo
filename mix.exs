@@ -23,8 +23,7 @@ defmodule Servox.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
-      mod: {Servox.Application, []}
+      extra_applications: [:logger]
     ]
   end
 
@@ -33,6 +32,7 @@ defmodule Servox.MixProject do
 
   defp deps do
     [
+      {:telemetry, "~> 1.3"},
       {:rustler_precompiled, "~> 0.8.4"},
       {:rustler, "~> 0.37.3", optional: true},
       {:mimic, "~> 2.3", only: :test},
