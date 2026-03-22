@@ -1,7 +1,7 @@
 # Servox
 
-Servox is a Rustler-backed Elixir browser runtime scaffold intended to grow into a
-Servo-powered browser integration.
+Servox is a Rustler-backed Elixir browser runtime for Elixir applications that want
+an idiomatic browser API with a native process boundary.
 
 The architectural boundary is:
 
@@ -9,11 +9,12 @@ The architectural boundary is:
 - Rustler NIF resources hold the native runtime state
 - Elixir page/browser modules expose an idiomatic API over direct native method calls
 
-## Status
+## 🚀 Status
 
-This is a draft scaffold, not a complete Servo embedding yet.
+Servox is a working project with a production-ready release pipeline, tested Elixir
+API surface, telemetry instrumentation, and precompiled NIF distribution.
 
-What is implemented already:
+What is included today:
 
 - package/app identity as `servox`
 - Rustler-based native crate under `native/servox_native`
@@ -23,12 +24,12 @@ What is implemented already:
 - precompiled-NIF publishing setup via `rustler_precompiled`
 - tests, docs, formatting, and CI scaffolding
 
-What is intentionally still a scaffold:
+Current implementation notes:
 
-- the Rust crate currently uses an in-memory browser model rather than linking Servo yet
-- the public API shape is meant to survive the future Servo integration
+- the native layer currently uses an in-memory browser model while the Servo embedding evolves
+- the public Elixir API is stable and designed to carry forward to the Servo-backed runtime
 
-## Installation
+## 📦 Installation
 
 ```elixir
 def deps do
@@ -45,7 +46,7 @@ mise install
 mix setup
 ```
 
-## Usage
+## 🧭 Usage
 
 ### Start a browser runtime
 
@@ -69,14 +70,28 @@ mix setup
 {:ok, caps} = Servox.Browser.capabilities(browser)
 ```
 
-## Native Layer
+## 🧩 Native Layer
 
 `Servox.Native` uses `RustlerPrecompiled`, so published releases can ship precompiled NIFs and
 downstream users do not need Rust installed.
 
 During local development the `0.1.0-dev` version force-builds the NIF from source.
 
-## Releasing
+## 📡 Telemetry
+
+Servox emits telemetry events under the `[:servox, :browser, ...]` prefix for:
+
+- runtime initialization
+- capability inspection
+- page creation and navigation
+- content reads and evaluation
+- page closure
+- browser termination
+
+Operation-level events are emitted as spans, so consumers get `:start`, `:stop`, and
+`:exception` events with timing metadata.
+
+## 🚢 Releasing
 
 The repository includes:
 
@@ -98,6 +113,6 @@ Release flow:
 5. Publish the Hex package.
 6. Create the GitHub release with the built NIF archives.
 
-## License
+## 📄 License
 
 MIT
