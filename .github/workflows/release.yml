@@ -38,17 +38,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq libfontconfig1-dev pkg-config
 
-      - name: Install deps
-        run: |
-          mix deps.get
-          mix deps.compile
-          mix compile
-
       - id: plan
         shell: bash
         run: |
           set -euo pipefail
-          current_version=$(mix version current)
+          current_version=$(perl -ne 'print "$1\n" and exit if /@version "([^"]+)"/' mix.exs)
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
 
           if [ -n "$latest_tag" ]; then
@@ -73,7 +67,19 @@ jobs:
           fi
 
           if [ -n "$latest_tag" ]; then
-            version=$(mix version bump "$latest_tag" "$bump_type")
+            version=$(elixir -e '
+              version = Version.parse!(Enum.at(System.argv(), 0))
+              part = Enum.at(System.argv(), 1)
+
+              bumped =
+                case part do
+                  "major" -> %{version | major: version.major + 1, minor: 0, patch: 0}
+                  "minor" -> %{version | minor: version.minor + 1, patch: 0}
+                  "patch" -> %{version | patch: version.patch + 1}
+                end
+
+              IO.puts(to_string(bumped))
+            ' "$latest_tag" "$bump_type")
             git cliff --tag "$version" -o CHANGELOG.next.md
             git cliff --config .github/cliff-release.toml --tag "$version" --unreleased --strip all -o RELEASE_NOTES.md
           else
@@ -231,7 +237,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mix version set "${{ needs.prepare.outputs.version }}"
+          version="${{ needs.prepare.outputs.version }}"
+          perl -0pi -e 's/@version "[^"]+"/@version "'"$version"'"/' mix.exs
 
       - name: Generate checksum file
         shell: bash
