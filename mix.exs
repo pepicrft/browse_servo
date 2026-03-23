@@ -55,20 +55,26 @@ defmodule BrowseServo.MixProject do
 
   defp package do
     [
-      files: ~w(
-        .formatter.exs
-        CHANGELOG.md
-        LICENSE
-        README.md
-        checksum-*.exs
-        config
-        lib
-        mix.exs
-        native
-      ),
+      files: package_files(),
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url}
     ]
+  end
+
+  defp package_files do
+    [
+      ".formatter.exs",
+      "CHANGELOG.md",
+      "LICENSE",
+      "README.md",
+      "mix.exs",
+      "native/browse_servo_native/Cargo.lock",
+      "native/browse_servo_native/Cargo.toml",
+      "native/browse_servo_native/src"
+    ] ++
+      Path.wildcard("checksum-*.exs") ++
+      Path.wildcard("config/*.exs") ++
+      Path.wildcard("lib/**/*.ex")
   end
 
   defp aliases do
