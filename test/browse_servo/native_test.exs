@@ -1,6 +1,13 @@
 defmodule BrowseServo.NativeTest do
   use ExUnit.Case, async: true
 
+  @moduletag skip:
+               if(System.get_env("CI") == "true" and match?({:unix, :linux}, :os.type()),
+                 do:
+                   "Servo NIF cannot be loaded on GitHub Linux runners due static TLS limits",
+                 else: false
+               )
+
   test "native runtime returns capabilities" do
     assert {:ok, runtime} = BrowseServo.Native.new_runtime()
     assert {:ok, capabilities} = BrowseServo.Native.capabilities(runtime)
