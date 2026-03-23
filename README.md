@@ -130,15 +130,6 @@ The repository includes:
 The release workflow is triggered manually from GitHub Actions and accepts a semver
 version like `0.1.0`.
 
-Release flow:
-
-1. Build all NIF archives for the configured targets.
-2. Generate the checksum file included in the Hex package.
-3. Update `mix.exs` and `CHANGELOG.md`.
-4. Commit the release metadata and push the release branch plus `v<version>` atomically.
-5. Publish the Hex package.
-6. Create the GitHub release with the built NIF archives.
-
 The git ref update is atomic for the release commit and tag. GitHub release creation runs
 immediately after that successful push.
 
