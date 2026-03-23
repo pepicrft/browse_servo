@@ -44,8 +44,8 @@ defmodule BrowseServoTest do
 
     assert {:ok, "https://example.com"} =
              BrowseServo.checkout(fn browser ->
-               {:ok, page} = BrowseServo.Browser.new_page(browser, url: "https://example.com")
-               {:ok, page.url}
+               :ok = BrowseServo.Browser.navigate(browser, "https://example.com")
+               BrowseServo.Browser.current_url(browser)
              end)
   end
 

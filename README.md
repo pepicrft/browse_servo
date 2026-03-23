@@ -4,9 +4,9 @@ BrowseServo is a Rustler-backed Elixir browser runtime for Elixir applications t
 an idiomatic browser API with a native process boundary and a Servo-backed execution
 engine.
 
-It follows the same shared-interface pattern used by `Chrona`: BrowseServo keeps its own
-API and native runtime, while delegating pool management and browser capability
-integration to [`Browse`](https://hex.pm/packages/browse) under the hood.
+It follows the same shared-interface pattern used by `Chrona`: BrowseServo implements
+the shared [`Browse`](https://hex.pm/packages/browse) browser contract over a Servo-backed
+native runtime.
 
 The architectural boundary is:
 
@@ -24,9 +24,8 @@ What is included today:
 
 - package/app identity as `browse_servo`
 - Rustler-based native crate under `native/browse_servo_native`
-- `BrowseServo.Browser` as the Elixir process boundary
+- `BrowseServo.Browser` implementing the `Browse.Browser` contract
 - `BrowseServo.BrowseBackend` and `BrowseServo.BrowserPool` as the Browse-backed integration layer
-- `BrowseServo.Page` as the high-level page handle
 - telemetry events for browser lifecycle and page operations
 - precompiled-NIF publishing setup via `rustler_precompiled`
 - tests, docs, formatting, and CI
@@ -58,20 +57,14 @@ mix setup
 {:ok, browser} = BrowseServo.start_link()
 ```
 
-### Open and use a page
+### Use the browser contract directly
 
 ```elixir
-{:ok, page} = BrowseServo.Browser.new_page(browser, url: "https://example.com")
-{:ok, page} = BrowseServo.Page.goto(page, "https://example.com/docs")
-{:ok, title} = BrowseServo.Page.title(page)
-{:ok, html} = BrowseServo.Page.content(page)
-{:ok, value} = BrowseServo.Page.evaluate(page, "document.title")
-```
-
-### Inspect runtime capabilities
-
-```elixir
-{:ok, caps} = BrowseServo.Browser.capabilities(browser)
+:ok = BrowseServo.Browser.navigate(browser, "https://example.com/docs")
+{:ok, url} = BrowseServo.Browser.current_url(browser)
+{:ok, html} = BrowseServo.Browser.content(browser)
+{:ok, value} = BrowseServo.Browser.evaluate(browser, "document.title")
+{:ok, image} = BrowseServo.Browser.capture_screenshot(browser, format: "png")
 ```
 
 ### Use Browse-backed pools

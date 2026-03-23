@@ -7,20 +7,14 @@ defmodule BrowseServo.Browser do
 
   use GenServer
 
-  alias BrowseServo.Page
   alias BrowseServo.Telemetry
 
   @type native_runtime :: term()
-  @type page_ref :: %{id: pos_integer(), title: String.t(), url: String.t()}
+  @type page_ref :: %{id: pos_integer(), url: String.t()}
 
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, Keyword.take(opts, [:name]))
-  end
-
-  @spec capabilities(pid()) :: {:ok, map()} | {:error, term()}
-  def capabilities(browser) do
-    GenServer.call(browser, :capabilities)
   end
 
   @spec current_url(pid()) :: {:ok, String.t()} | {:error, term()}
@@ -33,39 +27,14 @@ defmodule BrowseServo.Browser do
     GenServer.call(browser, {:navigate, url})
   end
 
-  @spec new_page(pid(), keyword()) :: {:ok, Page.t()} | {:error, term()}
-  def new_page(browser, opts \\ []) do
-    GenServer.call(browser, {:new_page, opts})
-  end
-
-  @spec goto(pid(), Page.t(), String.t()) :: {:ok, Page.t()} | {:error, term()}
-  def goto(browser, %Page{} = page, url) when is_binary(url) do
-    GenServer.call(browser, {:goto, page.id, url})
-  end
-
   @spec content(pid()) :: {:ok, String.t()} | {:error, term()}
   def content(browser) do
     GenServer.call(browser, :content)
   end
 
-  @spec content(pid(), Page.t()) :: {:ok, String.t()} | {:error, term()}
-  def content(browser, %Page{} = page) do
-    GenServer.call(browser, {:content, page.id})
-  end
-
-  @spec title(pid(), Page.t()) :: {:ok, String.t()} | {:error, term()}
-  def title(browser, %Page{} = page) do
-    GenServer.call(browser, {:title, page.id})
-  end
-
   @spec evaluate(pid(), String.t()) :: {:ok, term()} | {:error, term()}
   def evaluate(browser, expression) when is_binary(expression) do
     GenServer.call(browser, {:evaluate, expression})
-  end
-
-  @spec evaluate(pid(), Page.t(), String.t()) :: {:ok, term()} | {:error, term()}
-  def evaluate(browser, %Page{} = page, expression) when is_binary(expression) do
-    GenServer.call(browser, {:evaluate, page.id, expression})
   end
 
   @spec capture_screenshot(pid(), keyword()) :: {:ok, binary()} | {:error, term()}
@@ -91,11 +60,6 @@ defmodule BrowseServo.Browser do
   @spec wait_for(pid(), term(), keyword()) :: :ok | {:error, term()}
   def wait_for(browser, locator, opts \\ []) do
     GenServer.call(browser, {:wait_for, locator, opts})
-  end
-
-  @spec close_page(pid(), Page.t()) :: :ok | {:error, term()}
-  def close_page(browser, %Page{} = page) do
-    GenServer.call(browser, {:close_page, page.id})
   end
 
   @impl true
@@ -135,15 +99,6 @@ defmodule BrowseServo.Browser do
   end
 
   @impl true
-  def handle_call(:capabilities, _from, state) do
-    reply =
-      telemetry_span(:capabilities, %{browser: self()}, fn ->
-        state.native.capabilities(state.runtime)
-      end)
-
-    {:reply, reply, state}
-  end
-
   def handle_call(:current_url, _from, state) do
     {:reply, {:ok, state.current_page.url}, state}
   end
@@ -165,62 +120,10 @@ defmodule BrowseServo.Browser do
     {:reply, reply, next_state}
   end
 
-  def handle_call({:new_page, opts}, _from, state) do
-    url = Keyword.get(opts, :url, "about:blank")
-
-    {reply, next_state} =
-      telemetry_call(:new_page, %{browser: self(), url: url}, fn ->
-        case state.native.open_page(state.runtime, url) do
-          {:ok, attrs} ->
-            page = page_from_attrs(self(), attrs)
-            {:ok, {:ok, page}, %{state | current_page: page_ref(attrs)}}
-
-          {:error, reason} ->
-            {:error, reason, state}
-        end
-      end)
-
-    {:reply, reply, next_state}
-  end
-
-  def handle_call({:goto, page_id, url}, _from, state) do
-    {reply, next_state} =
-      telemetry_call(:goto, %{browser: self(), page_id: page_id, url: url}, fn ->
-        case state.native.navigate(state.runtime, page_id, url) do
-          {:ok, attrs} ->
-            page = page_from_attrs(self(), attrs)
-            {:ok, {:ok, page}, maybe_update_current_page(state, page_id, attrs)}
-
-          {:error, reason} ->
-            {:error, reason, state}
-        end
-      end)
-
-    {:reply, reply, next_state}
-  end
-
   def handle_call(:content, _from, state) do
     reply =
       telemetry_span(:content, %{browser: self(), page_id: state.current_page.id}, fn ->
         state.native.content(state.runtime, state.current_page.id)
-      end)
-
-    {:reply, reply, state}
-  end
-
-  def handle_call({:content, page_id}, _from, state) do
-    reply =
-      telemetry_span(:content, %{browser: self(), page_id: page_id}, fn ->
-        state.native.content(state.runtime, page_id)
-      end)
-
-    {:reply, reply, state}
-  end
-
-  def handle_call({:title, page_id}, _from, state) do
-    reply =
-      telemetry_span(:title, %{browser: self(), page_id: page_id}, fn ->
-        state.native.title(state.runtime, page_id)
       end)
 
     {:reply, reply, state}
@@ -237,19 +140,6 @@ defmodule BrowseServo.Browser do
         },
         fn ->
           state.native.evaluate(state.runtime, state.current_page.id, expression)
-        end
-      )
-
-    {:reply, reply, state}
-  end
-
-  def handle_call({:evaluate, page_id, expression}, _from, state) do
-    reply =
-      telemetry_span(
-        :evaluate,
-        %{browser: self(), page_id: page_id, expression_length: byte_size(expression)},
-        fn ->
-          state.native.evaluate(state.runtime, page_id, expression)
         end
       )
 
@@ -324,24 +214,6 @@ defmodule BrowseServo.Browser do
     {:reply, reply, state}
   end
 
-  def handle_call({:close_page, page_id}, _from, state) do
-    {reply, next_state} =
-      telemetry_call(:close_page, %{browser: self(), page_id: page_id}, fn ->
-        case state.native.close_page(state.runtime, page_id) do
-          :ok ->
-            {:ok, :ok, maybe_clear_current_page(state, page_id)}
-
-          {:error, reason} ->
-            {:error, reason, state}
-
-          other ->
-            {:ok, other, state}
-        end
-      end)
-
-    {:reply, reply, next_state}
-  end
-
   @impl true
   def terminate(_reason, state) do
     Telemetry.execute(
@@ -356,17 +228,8 @@ defmodule BrowseServo.Browser do
     :ok
   end
 
-  defp page_from_attrs(browser, attrs) do
-    %Page{
-      browser: browser,
-      id: Map.fetch!(attrs, :id),
-      title: Map.fetch!(attrs, :title),
-      url: Map.fetch!(attrs, :url)
-    }
-  end
-
   defp page_ref(attrs) do
-    %{id: Map.fetch!(attrs, :id), title: Map.fetch!(attrs, :title), url: Map.fetch!(attrs, :url)}
+    %{id: Map.fetch!(attrs, :id), url: Map.fetch!(attrs, :url)}
   end
 
   defp native_module(opts) do
@@ -375,22 +238,6 @@ defmodule BrowseServo.Browser do
       :native_module,
       Application.get_env(:browse_servo, :native_module, BrowseServo.Native)
     )
-  end
-
-  defp maybe_update_current_page(state, page_id, attrs) do
-    if state.current_page.id == page_id do
-      %{state | current_page: page_ref(attrs)}
-    else
-      state
-    end
-  end
-
-  defp maybe_clear_current_page(state, page_id) do
-    if state.current_page.id == page_id do
-      %{state | current_page: %{id: 0, title: "", url: "about:blank"}}
-    else
-      state
-    end
   end
 
   defp telemetry_call(event, metadata, fun) do
@@ -447,9 +294,6 @@ defmodule BrowseServo.Browser do
   defp telemetry_span(event, metadata, fun) do
     Telemetry.span([:browser, event], metadata, fun, &telemetry_metadata/1)
   end
-
-  defp telemetry_metadata({:ok, %Page{} = page}),
-    do: %{status: :ok, page_id: page.id, url: page.url}
 
   defp telemetry_metadata({:ok, value}), do: Map.merge(%{status: :ok}, summarize_result(value))
   defp telemetry_metadata(:ok), do: %{status: :ok}
