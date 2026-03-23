@@ -5,6 +5,7 @@ defmodule BrowseServo do
 
   alias BrowseServo.Browser
   alias BrowseServo.BrowserPool
+  alias BrowseServo.Telemetry
 
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -44,9 +45,8 @@ defmodule BrowseServo do
   def checkout(pool, fun, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, 30_000)
 
-    :telemetry.span([:browse_servo, :checkout], %{pool: pool, timeout: timeout}, fn ->
-      result = BrowserPool.checkout(pool, fun, timeout)
-      {result, %{pool: pool, timeout: timeout}}
+    Telemetry.span_shared([:checkout], %{pool: pool, timeout: timeout}, fn ->
+      BrowserPool.checkout(pool, fun, timeout)
     end)
   end
 

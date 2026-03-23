@@ -124,7 +124,13 @@ code generation requires Python 3.11+.
 
 ## 📡 Telemetry
 
-BrowseServo emits telemetry events under the `[:browse_servo, :browser, ...]` prefix for:
+BrowseServo emits telemetry events aligned with `browse_chrome`:
+
+- `[:browse, :checkout, :start | :stop | :exception]`
+- `[:browse_servo, :browser, :init, :start | :stop | :exception]`
+- `[:browse_servo, :browser, :capture, :start | :stop | :exception]`
+
+BrowseServo also emits operation-specific browser events under the `[:browse_servo, :browser, ...]` prefix for:
 
 - runtime initialization
 - capability inspection

@@ -8,6 +8,7 @@ defmodule BrowseServo.Browser do
   use GenServer
 
   alias BrowseServo.Page
+  alias BrowseServo.Telemetry
 
   @type native_runtime :: term()
   @type page_ref :: %{id: pos_integer(), title: String.t(), url: String.t()}
@@ -100,8 +101,13 @@ defmodule BrowseServo.Browser do
   @impl true
   def init(opts) do
     native = native_module(opts)
+    start_time = System.monotonic_time()
 
-    :telemetry.span([:browse_servo, :browser, :init], %{native_module: inspect(native)}, fn ->
+    Telemetry.execute([:browser, :init, :start], %{system_time: System.system_time()}, %{
+      native_module: inspect(native)
+    })
+
+    result =
       with {:ok, runtime} <- native.new_runtime(),
            {:ok, attrs} <- native.open_page(runtime, "about:blank") do
         state = %{
@@ -110,15 +116,22 @@ defmodule BrowseServo.Browser do
           current_page: page_ref(attrs)
         }
 
-        {{:ok, state}, %{status: :ok, page_id: state.current_page.id, url: state.current_page.url}}
+        {:ok, state}
       else
         {:error, reason} ->
-          {{:stop, reason}, %{status: :error, reason: reason}}
+          {:stop, reason}
 
         other ->
-          {{:stop, other}, %{status: :error, reason: other}}
+          {:stop, other}
       end
-    end)
+
+    Telemetry.execute(
+      [:browser, :init, :stop],
+      %{duration: System.monotonic_time() - start_time},
+      Map.merge(%{native_module: inspect(native)}, telemetry_metadata(result))
+    )
+
+    result
   end
 
   @impl true
@@ -249,7 +262,7 @@ defmodule BrowseServo.Browser do
 
     reply =
       telemetry_span(
-        :capture_screenshot,
+        :capture,
         %{browser: self(), format: format, page_id: state.current_page.id, quality: quality},
         fn ->
           perform_capture_screenshot(state, opts)
@@ -331,8 +344,8 @@ defmodule BrowseServo.Browser do
 
   @impl true
   def terminate(_reason, state) do
-    :telemetry.execute(
-      [:browse_servo, :browser, :terminate],
+    Telemetry.execute(
+      [:browser, :terminate],
       %{system_time: System.system_time()},
       %{
         browser: self()
@@ -381,15 +394,23 @@ defmodule BrowseServo.Browser do
   end
 
   defp telemetry_call(event, metadata, fun) do
-    :telemetry.span([:browse_servo, :browser, event], metadata, fn ->
-      case fun.() do
-        {:ok, reply, next_state} ->
-          {{reply, next_state}, telemetry_metadata(reply)}
+    result =
+      Telemetry.span(
+        [:browser, event],
+        metadata,
+        fn ->
+          fun.()
+        end,
+        fn
+          {:ok, reply, _next_state} -> telemetry_metadata(reply)
+          {:error, reason, _next_state} -> telemetry_metadata({:error, reason})
+        end
+      )
 
-        {:error, reason, next_state} ->
-          {{{:error, reason}, next_state}, telemetry_metadata({:error, reason})}
-      end
-    end)
+    case result do
+      {:ok, reply, next_state} -> {reply, next_state}
+      {:error, reason, next_state} -> {{:error, reason}, next_state}
+    end
   end
 
   defp perform_capture_screenshot(state, opts) do
@@ -424,25 +445,30 @@ defmodule BrowseServo.Browser do
   defp selector(selector) when is_binary(selector), do: selector
 
   defp telemetry_span(event, metadata, fun) do
-    :telemetry.span([:browse_servo, :browser, event], metadata, fn ->
-      result = fun.()
-      {result, telemetry_metadata(result)}
-    end)
+    Telemetry.span([:browser, event], metadata, fun, &telemetry_metadata/1)
   end
 
   defp telemetry_metadata({:ok, %Page{} = page}),
     do: %{status: :ok, page_id: page.id, url: page.url}
 
-  defp telemetry_metadata({:ok, value}), do: %{status: :ok, result: summarize(value)}
+  defp telemetry_metadata({:ok, value}), do: Map.merge(%{status: :ok}, summarize_result(value))
   defp telemetry_metadata(:ok), do: %{status: :ok}
-  defp telemetry_metadata({:error, reason}), do: %{status: :error, reason: reason}
-  defp telemetry_metadata({:stop, reason}), do: %{status: :error, reason: reason}
-  defp telemetry_metadata(other), do: %{status: :ok, result: summarize(other)}
+  defp telemetry_metadata({:error, reason}), do: %{status: :error, error: reason}
+  defp telemetry_metadata({:stop, reason}), do: %{status: :error, error: reason}
+  defp telemetry_metadata(other), do: Map.merge(%{status: :ok}, summarize_result(other))
 
-  defp summarize(value) when is_binary(value), do: %{type: :binary, size: byte_size(value)}
-  defp summarize(value) when is_map(value), do: %{type: :map, size: map_size(value)}
-  defp summarize(value) when is_list(value), do: %{type: :list, size: length(value)}
-  defp summarize(value) when is_tuple(value), do: %{type: :tuple, size: tuple_size(value)}
-  defp summarize(value) when is_atom(value), do: %{type: :atom, value: value}
-  defp summarize(value), do: %{type: value}
+  defp summarize_result(value) when is_binary(value),
+    do: %{result: %{type: :binary, size: byte_size(value)}}
+
+  defp summarize_result(value) when is_map(value),
+    do: %{result: %{type: :map, size: map_size(value)}}
+
+  defp summarize_result(value) when is_list(value),
+    do: %{result: %{type: :list, size: length(value)}}
+
+  defp summarize_result(value) when is_tuple(value),
+    do: %{result: %{type: :tuple, size: tuple_size(value)}}
+
+  defp summarize_result(value) when is_atom(value), do: %{result: %{type: :atom, value: value}}
+  defp summarize_result(value), do: %{result: %{type: value}}
 end

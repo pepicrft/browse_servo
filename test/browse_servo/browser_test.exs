@@ -18,7 +18,7 @@ defmodule BrowseServo.BrowserTest do
       [:browse_servo, :browser, :navigate, :stop],
       [:browse_servo, :browser, :new_page, :start],
       [:browse_servo, :browser, :new_page, :stop],
-      [:browse_servo, :browser, :capture_screenshot, :stop],
+      [:browse_servo, :browser, :capture, :stop],
       [:browse_servo, :browser, :print_to_pdf, :stop],
       [:browse_servo, :browser, :click, :stop],
       [:browse_servo, :browser, :fill, :stop],
@@ -84,8 +84,8 @@ defmodule BrowseServo.BrowserTest do
     assert_receive {:telemetry_event, [:browse_servo, :browser, :navigate, :stop], %{duration: _},
                     %{status: :ok}}
 
-    assert_receive {:telemetry_event, [:browse_servo, :browser, :capture_screenshot, :stop],
-                    %{duration: _}, %{status: :ok}}
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :capture, :stop], %{duration: _},
+                    %{status: :ok}}
   end
 
   test "supports pdf output and browser actions" do
