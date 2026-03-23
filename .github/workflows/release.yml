@@ -160,6 +160,10 @@ jobs:
         with:
           target: ${{ matrix.target }}
 
+      - name: Ensure Rust target is installed
+        shell: bash
+        run: rustup target add "${{ matrix.target }}"
+
       - name: Build NIF archive
         id: build
         shell: bash
@@ -193,9 +197,10 @@ jobs:
 
           cp "target/${target}/release/${lib_name}" "${final_name}"
           tar -czf "${final_name}.tar.gz" "${final_name}"
+          mv "${final_name}.tar.gz" "${GITHUB_WORKSPACE}/"
 
           echo "file-name=${final_name}.tar.gz" >> "$GITHUB_OUTPUT"
-          echo "file-path=$(pwd)/${final_name}.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "file-path=${final_name}.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: Upload NIF artifact
         uses: actions/upload-artifact@v4
