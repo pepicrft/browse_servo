@@ -12,25 +12,7 @@ The architectural boundary is:
 
 - an Elixir `GenServer` owns the browser runtime
 - Rustler NIF resources hold the native runtime state
-- Elixir page/browser modules expose an idiomatic API over direct native method calls
-
-## 🚀 Status
-
-BrowseServo is a working project with a Servo-backed native runtime, a production-ready
-release pipeline, a tested Elixir API surface, telemetry instrumentation, and
-precompiled NIF distribution.
-
-What is included today:
-
-- package/app identity as `browse_servo`
-- Rustler-based native crate under `native/browse_servo_native`
-- `BrowseServo.Browser` implementing the `Browse.Browser` contract
-- `BrowseServo.BrowseBackend` and `BrowseServo.BrowserPool` as the Browse-backed integration layer
-- telemetry events for browser lifecycle and page operations
-- precompiled-NIF publishing setup via `rustler_precompiled`
-- tests, docs, formatting, and CI
-- Servo-backed navigation, JavaScript evaluation, screenshots, clicks, fills, waits, and PDF export
-- release artifacts for Linux, macOS, and Windows so downstream users do not need Cargo
+- Elixir modules expose the `Browse.Browser` contract over direct native method calls
 
 ## 📦 Installation
 
@@ -126,11 +108,11 @@ BrowseServo emits telemetry events aligned with `browse_chrome`:
 BrowseServo also emits operation-specific browser events under the `[:browse_servo, :browser, ...]` prefix for:
 
 - runtime initialization
-- capability inspection
-- page creation and navigation
+- navigation
 - content reads and evaluation
-- page closure
-- browser termination
+- screenshot capture
+- PDF export
+- element interaction and waits
 
 Operation-level events are emitted as spans, so consumers get `:start`, `:stop`, and
 `:exception` events with timing metadata.
