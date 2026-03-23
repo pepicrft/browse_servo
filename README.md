@@ -1,4 +1,9 @@
-# BrowseServo
+# browse_servo
+
+[![Hex.pm](https://img.shields.io/hexpm/v/browse_servo.svg)](https://hex.pm/packages/browse_servo)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/browse_servo)
+[![CI](https://github.com/pepicrft/browse_servo/actions/workflows/ci.yml/badge.svg)](https://github.com/pepicrft/browse_servo/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 BrowseServo is a Rustler-backed Elixir browser runtime for Elixir applications that want
 an idiomatic browser API with a native process boundary and a Servo-backed execution
