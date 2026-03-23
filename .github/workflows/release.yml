@@ -109,12 +109,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, use-cross: false }
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, use-cross: true }
-          - { os: ubuntu-latest, target: aarch64-unknown-linux-gnu, use-cross: true }
-          - { os: macos-14, target: aarch64-apple-darwin, use-cross: false }
-          - { os: macos-13, target: x86_64-apple-darwin, use-cross: false }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, use-cross: false }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: macos-14, target: aarch64-apple-darwin }
+          - { os: macos-13, target: x86_64-apple-darwin }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
 
     steps:
       - uses: actions/checkout@v4
@@ -164,14 +162,40 @@ jobs:
 
       - name: Build NIF archive
         id: build
-        uses: philss/rustler-precompiled-action@v1.1.4
-        with:
-          project-name: browse_servo_native
-          project-version: ${{ needs.prepare.outputs.version }}
-          target: ${{ matrix.target }}
-          nif-version: "2.15"
-          use-cross: ${{ matrix.use-cross }}
-          project-dir: native/browse_servo_native
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${{ needs.prepare.outputs.version }}"
+          target="${{ matrix.target }}"
+          nif_version="2.15"
+
+          cd native/browse_servo_native
+          cargo build --release --target "$target"
+
+          lib_prefix="lib"
+          lib_suffix=".so"
+          final_suffix=".so"
+
+          case "$target" in
+            *-apple-darwin)
+              lib_suffix=".dylib"
+              ;;
+            *-pc-windows-*)
+              lib_prefix=""
+              lib_suffix=".dll"
+              final_suffix=".dll"
+              ;;
+          esac
+
+          lib_name="${lib_prefix}browse_servo_native${lib_suffix}"
+          final_name="${lib_prefix}browse_servo_native-v${version}-nif-${nif_version}-${target}${final_suffix}"
+
+          cp "target/${target}/release/${lib_name}" "${final_name}"
+          tar -czf "${final_name}.tar.gz" "${final_name}"
+
+          echo "file-name=${final_name}.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "file-path=$(pwd)/${final_name}.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: Upload NIF artifact
         uses: actions/upload-artifact@v4
