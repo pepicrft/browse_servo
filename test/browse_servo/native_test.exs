@@ -3,8 +3,7 @@ defmodule BrowseServo.NativeTest do
 
   @moduletag skip:
                if(System.get_env("CI") == "true" and match?({:unix, :linux}, :os.type()),
-                 do:
-                   "Servo NIF cannot be loaded on GitHub Linux runners due static TLS limits",
+                 do: "Servo NIF cannot be loaded on GitHub Linux runners due static TLS limits",
                  else: false
                )
 
