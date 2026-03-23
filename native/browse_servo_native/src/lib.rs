@@ -398,12 +398,7 @@ impl WorkerState {
 
     fn open_page(&mut self, url: String) -> Result<PageState, String> {
         let url = parse_url(&url)?;
-        let webview = WebViewBuilder::new(&self.servo, self.rendering_context.clone())
-            .delegate(self.delegate.clone())
-            .url(url)
-            .build();
-
-        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
+        let webview = self.build_webview(url)?;
 
         let page_id = self.next_page_id;
         self.next_page_id += 1;
@@ -414,9 +409,9 @@ impl WorkerState {
 
     fn navigate(&mut self, page_id: u64, url: String) -> Result<PageState, String> {
         let url = parse_url(&url)?;
-        let webview = self.webview(page_id)?.clone();
-        webview.load(url);
-        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
+        let _ = self.webview(page_id)?;
+        let webview = self.build_webview(url)?;
+        self.webviews.insert(page_id, webview.clone());
         self.page_state(page_id, &webview)
     }
 
@@ -599,6 +594,16 @@ impl WorkerState {
 
     fn webview(&self, page_id: u64) -> Result<&WebView, String> {
         self.webviews.get(&page_id).ok_or_else(|| "not_found".into())
+    }
+
+    fn build_webview(&mut self, url: Url) -> Result<WebView, String> {
+        let webview = WebViewBuilder::new(&self.servo, self.rendering_context.clone())
+            .delegate(self.delegate.clone())
+            .url(url)
+            .build();
+
+        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
+        Ok(webview)
     }
 
     fn wait_for_load(&mut self, webview: &WebView, timeout_ms: u64) -> Result<(), String> {

@@ -78,4 +78,43 @@ defmodule BrowseServo.NativeTest do
     assert :ok = BrowseServo.Native.close_page(runtime, page.id)
     assert :ok = BrowseServo.Native.shutdown(runtime)
   end
+
+  test "native runtime navigates an existing page to a data url" do
+    html = """
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Navigated</title>
+      </head>
+      <body>
+        <main id="greeting">hello after navigate</main>
+      </body>
+    </html>
+    """
+
+    url = "data:text/html;base64," <> Base.encode64(html)
+
+    assert {:ok, runtime} = BrowseServo.Native.new_runtime()
+    assert {:ok, page} = BrowseServo.Native.open_page(runtime, "about:blank")
+    assert {:ok, page} = BrowseServo.Native.navigate(runtime, page.id, url)
+    assert {:ok, "Navigated"} = BrowseServo.Native.title(runtime, page.id)
+
+    assert {:ok, content} = BrowseServo.Native.content(runtime, page.id)
+    assert content =~ "<title>Navigated</title>"
+    assert content =~ ~s(<main id="greeting">hello after navigate</main>)
+
+    assert {:ok, true} =
+             BrowseServo.Native.evaluate(
+               runtime,
+               page.id,
+               "document.querySelector('#greeting') !== null"
+             )
+
+    assert {:ok, <<137, 80, 78, 71, _::binary>>} =
+             BrowseServo.Native.capture_screenshot(runtime, page.id, "png", 90)
+
+    assert :ok = BrowseServo.Native.close_page(runtime, page.id)
+    assert :ok = BrowseServo.Native.shutdown(runtime)
+  end
 end
