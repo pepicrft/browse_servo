@@ -404,7 +404,7 @@ impl WorkerState {
         self.next_page_id += 1;
         self.webviews.insert(page_id, webview.clone());
 
-        self.page_state(page_id, &webview)
+        Ok(self.page_state(page_id, &webview))
     }
 
     fn navigate(&mut self, page_id: u64, url: String) -> Result<PageState, String> {
@@ -412,7 +412,7 @@ impl WorkerState {
         let _ = self.webview(page_id)?;
         let webview = self.build_webview(url)?;
         self.webviews.insert(page_id, webview.clone());
-        self.page_state(page_id, &webview)
+        Ok(self.page_state(page_id, &webview))
     }
 
     fn content(&mut self, page_id: u64) -> Result<String, String> {
@@ -455,47 +455,13 @@ impl WorkerState {
         format: &str,
         quality: u8,
     ) -> Result<Vec<u8>, String> {
-        let webview = self.webview(page_id)?.clone();
-        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
-
-        let stored = Rc::new(RefCell::new(None));
-        let callback_stored = stored.clone();
-
-        webview.take_screenshot(None, move |result| {
-            *callback_stored.borrow_mut() = Some(result);
-        });
-
-        self.spin_until(DEFAULT_TIMEOUT_MS, || stored.borrow().is_none())?;
-
-        let result = match stored.borrow_mut().take() {
-            Some(Ok(image)) => encode_image(&image, format, quality),
-            Some(Err(error)) => Err(format!("{error:?}")),
-            None => Err("screenshot_missing_result".into()),
-        };
-
-        result
+        let image = self.take_screenshot_image(page_id)?;
+        encode_image(&image, format, quality)
     }
 
     fn print_to_pdf(&mut self, page_id: u64) -> Result<Vec<u8>, String> {
-        let webview = self.webview(page_id)?.clone();
-        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
-
-        let stored = Rc::new(RefCell::new(None));
-        let callback_stored = stored.clone();
-
-        webview.take_screenshot(None, move |result| {
-            *callback_stored.borrow_mut() = Some(result);
-        });
-
-        self.spin_until(DEFAULT_TIMEOUT_MS, || stored.borrow().is_none())?;
-
-        let result = match stored.borrow_mut().take() {
-            Some(Ok(image)) => render_pdf(&image),
-            Some(Err(error)) => Err(format!("{error:?}")),
-            None => Err("pdf_missing_result".into()),
-        };
-
-        result
+        let image = self.take_screenshot_image(page_id)?;
+        render_pdf(&image)
     }
 
     fn click(&mut self, page_id: u64, selector: &str) -> Result<(), String> {
@@ -542,11 +508,8 @@ impl WorkerState {
         let deadline = Instant::now() + Duration::from_millis(timeout_ms);
 
         loop {
-            let script = format!("(() => document.querySelector({}) !== null)()", quote_js(selector));
-            match self.evaluate(page_id, script)? {
-                NativeValue::Boolean(true) => return Ok(()),
-                NativeValue::Boolean(false) => {},
-                other => return Err(format!("unexpected_wait_result:{other:?}")),
+            if self.selector_exists(page_id, selector)? {
+                return Ok(());
             }
 
             if Instant::now() >= deadline {
@@ -581,15 +544,15 @@ impl WorkerState {
         }
     }
 
-    fn page_state(&self, page_id: u64, webview: &WebView) -> Result<PageState, String> {
-        Ok(PageState {
+    fn page_state(&self, page_id: u64, webview: &WebView) -> PageState {
+        PageState {
             id: page_id,
             title: webview.page_title().unwrap_or_default(),
             url: webview
                 .url()
                 .map(|url| url.to_string())
                 .unwrap_or_else(|| "about:blank".into()),
-        })
+        }
     }
 
     fn webview(&self, page_id: u64) -> Result<&WebView, String> {
@@ -606,8 +569,39 @@ impl WorkerState {
         Ok(webview)
     }
 
+    fn take_screenshot_image(&mut self, page_id: u64) -> Result<RgbaImage, String> {
+        let webview = self.webview(page_id)?.clone();
+        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
+
+        let stored = Rc::new(RefCell::new(None));
+        let callback_stored = stored.clone();
+
+        webview.take_screenshot(None, move |result| {
+            *callback_stored.borrow_mut() = Some(result);
+        });
+
+        self.spin_until(DEFAULT_TIMEOUT_MS, || stored.borrow().is_none())?;
+
+        let result = match stored.borrow_mut().take() {
+            Some(Ok(image)) => Ok(image),
+            Some(Err(error)) => Err(format!("{error:?}")),
+            None => Err("screenshot_missing_result".into()),
+        };
+
+        result
+    }
+
     fn wait_for_load(&mut self, webview: &WebView, timeout_ms: u64) -> Result<(), String> {
         self.spin_until(timeout_ms, || webview.load_status() != LoadStatus::Complete)
+    }
+
+    fn selector_exists(&mut self, page_id: u64, selector: &str) -> Result<bool, String> {
+        let script = format!("(() => document.querySelector({}) !== null)()", quote_js(selector));
+
+        match self.evaluate(page_id, script)? {
+            NativeValue::Boolean(value) => Ok(value),
+            other => Err(format!("unexpected_wait_result:{other:?}")),
+        }
     }
 
     fn spin_until(
