@@ -7,7 +7,11 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+dpi = "0.1"
 rustler = { version = "0.37.0", default-features = false, features = ["derive"] }
+servo = { git = "https://github.com/servo/servo", package = "servo", rev = "fa5e7bffdd6a09a035b9ae00163ee48ddb2a33ea", default-features = false, features = ["js_jit"] }
+url = "2.5"
 
 [features]
 default = ["nif_version_2_15"]

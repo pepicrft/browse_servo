@@ -29,6 +29,10 @@ defmodule BrowseServo.TestNative do
   def evaluate(:runtime, _page_id, expression), do: {:ok, expression}
 
   def capture_screenshot(:runtime, _page_id, _format, _quality), do: {:ok, <<137, 80, 78, 71>>}
+  def print_to_pdf(:runtime, _page_id), do: {:ok, <<37, 80, 68, 70>>}
+  def click(:runtime, _page_id, _selector), do: :ok
+  def fill(:runtime, _page_id, _selector, _value), do: :ok
+  def wait_for(:runtime, _page_id, _selector, _timeout_ms), do: :ok
 
   def close_page(:runtime, _page_id), do: :ok
 end

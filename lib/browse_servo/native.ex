@@ -28,5 +28,9 @@ defmodule BrowseServo.Native do
   def capture_screenshot(_runtime, _page_id, _format, _quality),
     do: :erlang.nif_error(:nif_not_loaded)
 
+  def print_to_pdf(_runtime, _page_id), do: :erlang.nif_error(:nif_not_loaded)
+  def click(_runtime, _page_id, _selector), do: :erlang.nif_error(:nif_not_loaded)
+  def fill(_runtime, _page_id, _selector, _value), do: :erlang.nif_error(:nif_not_loaded)
+  def wait_for(_runtime, _page_id, _selector, _timeout_ms), do: :erlang.nif_error(:nif_not_loaded)
   def close_page(_runtime, _page_id), do: :erlang.nif_error(:nif_not_loaded)
 end

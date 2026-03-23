@@ -95,7 +95,7 @@ defmodule BrowseServo.BrowserTest do
     assert :ok = Browser.click(browser, "#submit")
     assert :ok = Browser.fill(browser, "#email", "user@example.com")
     assert :ok = Browser.wait_for(browser, "#done", timeout: 1_000)
-    assert {:ok, <<>>} = Browser.print_to_pdf(browser)
+    assert {:ok, <<37, 80, 68, 70>>} = Browser.print_to_pdf(browser)
 
     assert_receive {:telemetry_event, [:browse_servo, :browser, :click, :stop], %{duration: _},
                     %{status: :ok}}

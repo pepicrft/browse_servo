@@ -10,16 +10,70 @@ defmodule BrowseServo.NativeTest do
   end
 
   test "native runtime manages page state" do
+    url =
+      "data:text/html,%3C!doctype%20html%3E%3Ctitle%3EHello%3C%2Ftitle%3E%3Cbody%3E%3Cmain%20data-testid%3D%22greeting%22%3EHello%3C%2Fmain%3E%3C%2Fbody%3E"
+
     assert {:ok, runtime} = BrowseServo.Native.new_runtime()
-    assert {:ok, page} = BrowseServo.Native.open_page(runtime, "https://example.com")
-    assert {:ok, "Page for https://example.com"} = BrowseServo.Native.title(runtime, page.id)
+    assert {:ok, page} = BrowseServo.Native.open_page(runtime, url)
+    assert {:ok, "Hello"} = BrowseServo.Native.title(runtime, page.id)
 
-    assert {:ok,
-            "<html><head><title>Page for https://example.com</title></head><body><main data-url=\"https://example.com\"></main></body></html>"} =
-             BrowseServo.Native.content(runtime, page.id)
+    assert {:ok, content} = BrowseServo.Native.content(runtime, page.id)
+    assert content =~ "<title>Hello</title>"
+    assert content =~ ~s(data-testid="greeting")
 
-    assert {:ok, "Page for https://example.com"} =
-             BrowseServo.Native.evaluate(runtime, page.id, "document.title")
+    assert {:ok, "Hello"} = BrowseServo.Native.evaluate(runtime, page.id, "document.title")
+
+    assert :ok = BrowseServo.Native.close_page(runtime, page.id)
+    assert :ok = BrowseServo.Native.shutdown(runtime)
+  end
+
+  test "native runtime supports interaction, screenshots, and pdf output" do
+    html = """
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Servo Actions</title>
+      </head>
+      <body>
+        <input id="name" value="" />
+        <button id="go" onclick="document.body.setAttribute('data-clicked', 'yes'); document.getElementById('ready').textContent = document.getElementById('name').value">Go</button>
+        <div id="ready"></div>
+      </body>
+    </html>
+    """
+
+    url = "data:text/html;base64," <> Base.encode64(html)
+
+    assert {:ok, runtime} = BrowseServo.Native.new_runtime()
+    assert {:ok, page} = BrowseServo.Native.open_page(runtime, url)
+
+    assert :ok = BrowseServo.Native.fill(runtime, page.id, "#name", "hello servo")
+
+    assert {:ok, "hello servo"} =
+             BrowseServo.Native.evaluate(runtime, page.id, "document.querySelector('#name').value")
+
+    assert :ok = BrowseServo.Native.click(runtime, page.id, "#go")
+    assert :ok = BrowseServo.Native.wait_for(runtime, page.id, "#ready", 1_000)
+
+    assert {:ok, "yes"} =
+             BrowseServo.Native.evaluate(
+               runtime,
+               page.id,
+               "document.body.getAttribute('data-clicked')"
+             )
+
+    assert {:ok, "hello servo"} =
+             BrowseServo.Native.evaluate(
+               runtime,
+               page.id,
+               "document.querySelector('#ready').textContent"
+             )
+
+    assert {:ok, <<137, 80, 78, 71, _::binary>>} =
+             BrowseServo.Native.capture_screenshot(runtime, page.id, "png", 90)
+
+    assert {:ok, <<37, 80, 68, 70, _::binary>>} = BrowseServo.Native.print_to_pdf(runtime, page.id)
 
     assert :ok = BrowseServo.Native.close_page(runtime, page.id)
     assert :ok = BrowseServo.Native.shutdown(runtime)

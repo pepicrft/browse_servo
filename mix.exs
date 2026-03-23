@@ -14,7 +14,7 @@ defmodule BrowseServo.MixProject do
       docs: docs(),
       package: package(),
       aliases: aliases(),
-      description: "Rustler-backed Elixir browser runtime scaffold for BrowseServo",
+      description: "Rustler-backed Elixir browser runtime for Servo-powered browser workflows",
       elixirc_paths: elixirc_paths(Mix.env()),
       name: "BrowseServo",
       source_url: @source_url

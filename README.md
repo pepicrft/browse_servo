@@ -1,7 +1,8 @@
 # BrowseServo
 
 BrowseServo is a Rustler-backed Elixir browser runtime for Elixir applications that want
-an idiomatic browser API with a native process boundary.
+an idiomatic browser API with a native process boundary and a Servo-backed execution
+engine.
 
 It follows the same shared-interface pattern used by `Chrona`: BrowseServo keeps its own
 API and native runtime, while delegating pool management and browser capability
@@ -15,8 +16,9 @@ The architectural boundary is:
 
 ## 🚀 Status
 
-BrowseServo is a working project with a production-ready release pipeline, tested Elixir
-API surface, telemetry instrumentation, and precompiled NIF distribution.
+BrowseServo is a working project with a Servo-backed native runtime, a production-ready
+release pipeline, a tested Elixir API surface, telemetry instrumentation, and
+precompiled NIF distribution.
 
 What is included today:
 
@@ -27,13 +29,9 @@ What is included today:
 - `BrowseServo.Page` as the high-level page handle
 - telemetry events for browser lifecycle and page operations
 - precompiled-NIF publishing setup via `rustler_precompiled`
-- tests, docs, formatting, and CI scaffolding
-
-Current implementation notes:
-
-- the native layer currently uses an in-memory browser model while the Servo embedding evolves
-- the public Elixir API is stable and designed to carry forward to the Servo-backed runtime
-- screenshot capture is currently rendered through headless Chrome while the Servo embedding evolves
+- tests, docs, formatting, and CI
+- Servo-backed navigation, JavaScript evaluation, screenshots, clicks, fills, waits, and PDF export
+- release artifacts for Linux, macOS, and Windows so downstream users do not need Cargo
 
 ## 📦 Installation
 
@@ -113,14 +111,16 @@ end)
 
 ## 🧩 Native Layer
 
-`BrowseServo.Native` uses `RustlerPrecompiled`, so published releases can ship precompiled NIFs and
-downstream users do not need Rust installed.
+`BrowseServo.Native` uses `RustlerPrecompiled`, so published releases ship precompiled
+NIFs and downstream users do not need Rust or Cargo installed.
 
 During local development the `0.1.0-dev` version force-builds the NIF from source.
 
-Screenshot capture currently uses a local Chrome/Chromium installation. BrowseServo will
-look for Chrome in common locations, or you can configure `:chrome_path` / `CHROME_PATH`
-explicitly.
+The native crate links directly against Servo from the upstream Servo repository, pinned
+to a specific commit in `native/browse_servo_native/Cargo.toml`.
+
+For repository development, `mise.toml` also pins Python 3.12 because current Servo
+code generation requires Python 3.11+.
 
 ## 📡 Telemetry
 
@@ -157,6 +157,9 @@ Release flow:
 4. Commit the release metadata and push the release branch plus `v<version>` atomically.
 5. Publish the Hex package.
 6. Create the GitHub release with the built NIF archives.
+
+The git ref update is atomic for the release commit and tag. GitHub release creation runs
+immediately after that successful push.
 
 ## 📄 License
 

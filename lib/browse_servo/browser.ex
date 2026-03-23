@@ -400,50 +400,24 @@ defmodule BrowseServo.Browser do
   end
 
   defp perform_print_to_pdf(state, _opts) do
-    state.native.evaluate(state.runtime, state.current_page.id, "window.print()")
-    |> case do
-      {:ok, _} -> {:ok, <<>>}
-      {:error, _} = error -> error
-    end
+    state.native.print_to_pdf(state.runtime, state.current_page.id)
   end
 
   defp perform_click(state, locator, _opts) do
-    selector = selector(locator)
-    expression = "document.querySelector(#{inspect(selector)})?.click()"
-
-    state.native.evaluate(state.runtime, state.current_page.id, expression)
-    |> case do
-      {:ok, _} -> :ok
-      {:error, _} = error -> error
-    end
+    state.native.click(state.runtime, state.current_page.id, selector(locator))
   end
 
   defp perform_fill(state, locator, value, _opts) do
-    selector = selector(locator)
-
-    expression = """
-    (() => {
-      const el = document.querySelector(#{inspect(selector)});
-      if (el) { el.value = #{inspect(value)}; }
-    })()
-    """
-
-    state.native.evaluate(state.runtime, state.current_page.id, expression)
-    |> case do
-      {:ok, _} -> :ok
-      {:error, _} = error -> error
-    end
+    state.native.fill(state.runtime, state.current_page.id, selector(locator), value)
   end
 
-  defp perform_wait_for(state, locator, _opts) do
-    selector = selector(locator)
-    expression = "document.querySelector(#{inspect(selector)}) !== null"
-
-    state.native.evaluate(state.runtime, state.current_page.id, expression)
-    |> case do
-      {:ok, _} -> :ok
-      {:error, _} = error -> error
-    end
+  defp perform_wait_for(state, locator, opts) do
+    state.native.wait_for(
+      state.runtime,
+      state.current_page.id,
+      selector(locator),
+      Keyword.get(opts, :timeout, 5_000)
+    )
   end
 
   defp selector({:css, selector}) when is_binary(selector), do: selector
