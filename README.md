@@ -117,22 +117,6 @@ BrowseServo also emits operation-specific browser events under the `[:browse_ser
 Operation-level events are emitted as spans, so consumers get `:start`, `:stop`, and
 `:exception` events with timing metadata.
 
-## 🚢 Releasing
-
-The repository includes:
-
-- `git-cliff` configuration in `cliff.toml`
-- CI checks for tests, warning-free compilation, and formatting
-- a `Release` workflow that builds precompiled NIFs for Linux, macOS, and Windows
-- checksum generation for `RustlerPrecompiled`
-- atomic git push of the release commit and tag with `git push --atomic`
-
-The release workflow is triggered manually from GitHub Actions and accepts a semver
-version like `0.1.0`.
-
-The git ref update is atomic for the release commit and tag. GitHub release creation runs
-immediately after that successful push.
-
 ## 📄 License
 
 MIT
