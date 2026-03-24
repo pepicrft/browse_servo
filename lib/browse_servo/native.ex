@@ -2,7 +2,7 @@ defmodule BrowseServo.Native.Release do
   @moduledoc false
 
   def base_url(version) do
-    "https://github.com/pepicrft/browse_servo/releases/download/v#{version}"
+    "https://github.com/pepicrft/browse_servo/releases/download/#{version}/"
   end
 end
 
