@@ -1,8 +1,10 @@
 defmodule BrowseServo.Native.Release do
   @moduledoc false
 
-  def base_url(version) do
-    "https://github.com/pepicrft/browse_servo/releases/download/#{version}/"
+  @version Mix.Project.config()[:version]
+
+  def base_url(file_name) do
+    "https://github.com/pepicrft/browse_servo/releases/download/#{@version}/#{file_name}"
   end
 end
 
