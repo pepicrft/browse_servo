@@ -34,5 +34,12 @@ defmodule BrowseServo.Native do
   def click(_runtime, _page_id, _selector), do: :erlang.nif_error(:nif_not_loaded)
   def fill(_runtime, _page_id, _selector, _value), do: :erlang.nif_error(:nif_not_loaded)
   def wait_for(_runtime, _page_id, _selector, _timeout_ms), do: :erlang.nif_error(:nif_not_loaded)
+  def hover(_runtime, _page_id, _selector), do: :erlang.nif_error(:nif_not_loaded)
+  def select_option(_runtime, _page_id, _selector, _value), do: :erlang.nif_error(:nif_not_loaded)
+  def get_text(_runtime, _page_id, _selector), do: :erlang.nif_error(:nif_not_loaded)
+  def get_attribute(_runtime, _page_id, _selector, _name), do: :erlang.nif_error(:nif_not_loaded)
+  def get_cookies(_runtime, _page_id), do: :erlang.nif_error(:nif_not_loaded)
+  def set_cookie(_runtime, _page_id, _cookie_string), do: :erlang.nif_error(:nif_not_loaded)
+  def clear_cookies(_runtime, _page_id), do: :erlang.nif_error(:nif_not_loaded)
   def close_page(_runtime, _page_id), do: :erlang.nif_error(:nif_not_loaded)
 end

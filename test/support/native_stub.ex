@@ -33,6 +33,13 @@ defmodule BrowseServo.TestNative do
   def click(:runtime, _page_id, _selector), do: :ok
   def fill(:runtime, _page_id, _selector, _value), do: :ok
   def wait_for(:runtime, _page_id, _selector, _timeout_ms), do: :ok
+  def hover(:runtime, _page_id, _selector), do: :ok
+  def select_option(:runtime, _page_id, _selector, _value), do: :ok
+  def get_text(:runtime, _page_id, _selector), do: {:ok, "mock text"}
+  def get_attribute(:runtime, _page_id, _selector, _name), do: {:ok, "mock-value"}
+  def get_cookies(:runtime, _page_id), do: {:ok, []}
+  def set_cookie(:runtime, _page_id, _cookie_string), do: :ok
+  def clear_cookies(:runtime, _page_id), do: :ok
 
   def close_page(:runtime, _page_id), do: :ok
 end

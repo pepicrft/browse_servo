@@ -32,7 +32,7 @@ defmodule BrowseServo.MixProject do
 
   defp deps do
     [
-      {:browse, "~> 0.1.0"},
+      {:browse, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
       {:rustler_precompiled, "~> 0.8.4"},
       {:rustler, "~> 0.37.3", optional: true},

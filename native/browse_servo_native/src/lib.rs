@@ -94,6 +94,13 @@ enum Command {
     Click(u64, String, Sender<Result<(), String>>),
     Fill(u64, String, String, Sender<Result<(), String>>),
     WaitFor(u64, String, u64, Sender<Result<(), String>>),
+    Hover(u64, String, Sender<Result<(), String>>),
+    SelectOption(u64, String, String, Sender<Result<(), String>>),
+    GetText(u64, String, Sender<Result<String, String>>),
+    GetAttribute(u64, String, String, Sender<Result<NativeValue, String>>),
+    GetCookies(u64, Sender<Result<NativeValue, String>>),
+    SetCookie(u64, String, Sender<Result<(), String>>),
+    ClearCookies(u64, Sender<Result<(), String>>),
     ClosePage(u64, Sender<Result<(), String>>),
 }
 
@@ -307,6 +314,78 @@ fn wait_for(
 }
 
 #[rustler::nif]
+fn hover(
+    runtime: ResourceArc<RuntimeResource>,
+    page_id: u64,
+    selector: String,
+) -> NifResult<Atom> {
+    send_command(&runtime.sender, |reply| Command::Hover(page_id, selector, reply))?;
+    Ok(atoms::ok())
+}
+
+#[rustler::nif]
+fn select_option(
+    runtime: ResourceArc<RuntimeResource>,
+    page_id: u64,
+    selector: String,
+    value: String,
+) -> NifResult<Atom> {
+    send_command(&runtime.sender, |reply| Command::SelectOption(page_id, selector, value, reply))?;
+    Ok(atoms::ok())
+}
+
+#[rustler::nif]
+fn get_text(
+    runtime: ResourceArc<RuntimeResource>,
+    page_id: u64,
+    selector: String,
+) -> NifResult<(Atom, String)> {
+    let value = send_command(&runtime.sender, |reply| Command::GetText(page_id, selector, reply))?;
+    Ok((atoms::ok(), value))
+}
+
+#[rustler::nif]
+fn get_attribute<'a>(
+    env: Env<'a>,
+    runtime: ResourceArc<RuntimeResource>,
+    page_id: u64,
+    selector: String,
+    name: String,
+) -> NifResult<(Atom, Term<'a>)> {
+    let value = send_command(&runtime.sender, |reply| Command::GetAttribute(page_id, selector, name, reply))?;
+    Ok((atoms::ok(), encode_native_value(env, &value)))
+}
+
+#[rustler::nif]
+fn get_cookies<'a>(
+    env: Env<'a>,
+    runtime: ResourceArc<RuntimeResource>,
+    page_id: u64,
+) -> NifResult<(Atom, Term<'a>)> {
+    let value = send_command(&runtime.sender, |reply| Command::GetCookies(page_id, reply))?;
+    Ok((atoms::ok(), encode_native_value(env, &value)))
+}
+
+#[rustler::nif]
+fn set_cookie(
+    runtime: ResourceArc<RuntimeResource>,
+    page_id: u64,
+    cookie_string: String,
+) -> NifResult<Atom> {
+    send_command(&runtime.sender, |reply| Command::SetCookie(page_id, cookie_string, reply))?;
+    Ok(atoms::ok())
+}
+
+#[rustler::nif]
+fn clear_cookies(
+    runtime: ResourceArc<RuntimeResource>,
+    page_id: u64,
+) -> NifResult<Atom> {
+    send_command(&runtime.sender, |reply| Command::ClearCookies(page_id, reply))?;
+    Ok(atoms::ok())
+}
+
+#[rustler::nif]
 fn close_page(runtime: ResourceArc<RuntimeResource>, page_id: u64) -> NifResult<Atom> {
     send_command(&runtime.sender, |reply| Command::ClosePage(page_id, reply))?;
     Ok(atoms::ok())
@@ -352,6 +431,27 @@ fn worker_loop(receiver: Receiver<Command>) {
             },
             Command::WaitFor(page_id, selector, timeout_ms, reply) => {
                 let _ = reply.send(state.wait_for(page_id, &selector, timeout_ms));
+            },
+            Command::Hover(page_id, selector, reply) => {
+                let _ = reply.send(state.hover(page_id, &selector));
+            },
+            Command::SelectOption(page_id, selector, value, reply) => {
+                let _ = reply.send(state.select_option(page_id, &selector, &value));
+            },
+            Command::GetText(page_id, selector, reply) => {
+                let _ = reply.send(state.get_text(page_id, &selector));
+            },
+            Command::GetAttribute(page_id, selector, name, reply) => {
+                let _ = reply.send(state.get_attribute(page_id, &selector, &name));
+            },
+            Command::GetCookies(page_id, reply) => {
+                let _ = reply.send(state.get_cookies(page_id));
+            },
+            Command::SetCookie(page_id, cookie_string, reply) => {
+                let _ = reply.send(state.set_cookie(page_id, &cookie_string));
+            },
+            Command::ClearCookies(page_id, reply) => {
+                let _ = reply.send(state.clear_cookies(page_id));
             },
             Command::ClosePage(page_id, reply) => {
                 let _ = reply.send(state.close_page(page_id));
@@ -517,6 +617,106 @@ impl WorkerState {
             }
 
             self.spin_for(Duration::from_millis(25));
+        }
+    }
+
+    fn hover(&mut self, page_id: u64, selector: &str) -> Result<(), String> {
+        let webview = self.webview(page_id)?.clone();
+        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
+        self.wait_for(page_id, selector, DEFAULT_TIMEOUT_MS)?;
+        let point = self.selector_center(page_id, selector)?;
+
+        webview.notify_input_event(InputEvent::MouseMove(MouseMoveEvent::new(point.into())));
+
+        self.spin_for(Duration::from_millis(50));
+        Ok(())
+    }
+
+    fn select_option(&mut self, page_id: u64, selector: &str, value: &str) -> Result<(), String> {
+        let webview = self.webview(page_id)?.clone();
+        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
+        self.wait_for(page_id, selector, DEFAULT_TIMEOUT_MS)?;
+
+        let script = format!(
+            "(() => {{ const el = document.querySelector({selector}); if (!el) return 'not_found'; if (!(el instanceof HTMLSelectElement)) return 'not_select'; const opt = Array.from(el.options).find(o => o.value === {value}); if (!opt) return 'option_not_found'; el.value = {value}; try {{ el.dispatchEvent(new Event('input', {{ bubbles: true }})); }} catch (_e) {{}} try {{ el.dispatchEvent(new Event('change', {{ bubbles: true }})); }} catch (_e) {{}} return 'ok'; }})()",
+            selector = quote_js(selector),
+            value = quote_js(value)
+        );
+
+        match self.evaluate(page_id, script)? {
+            NativeValue::String(s) if s == "ok" => Ok(()),
+            NativeValue::String(s) => Err(s),
+            other => Err(format!("unexpected_select_result:{other:?}")),
+        }
+    }
+
+    fn get_text(&mut self, page_id: u64, selector: &str) -> Result<String, String> {
+        let webview = self.webview(page_id)?.clone();
+        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
+
+        let script = format!(
+            "(() => {{ const el = document.querySelector({selector}); if (!el) return null; return (el.innerText ?? el.textContent ?? '').trim(); }})()",
+            selector = quote_js(selector)
+        );
+
+        match self.evaluate(page_id, script)? {
+            NativeValue::String(s) => Ok(s),
+            NativeValue::Null => Err("not_found".into()),
+            other => Err(format!("unexpected_get_text_result:{other:?}")),
+        }
+    }
+
+    fn get_attribute(&mut self, page_id: u64, selector: &str, name: &str) -> Result<NativeValue, String> {
+        let webview = self.webview(page_id)?.clone();
+        self.wait_for_load(&webview, DEFAULT_TIMEOUT_MS)?;
+
+        let script = format!(
+            "(() => {{ const el = document.querySelector({selector}); if (!el) return {{ ok: false, error: 'not_found' }}; const v = el.getAttribute({name}); return {{ ok: true, value: v }}; }})()",
+            selector = quote_js(selector),
+            name = quote_js(name)
+        );
+
+        match self.evaluate(page_id, script)? {
+            NativeValue::Object(map) => {
+                match map.get("ok") {
+                    Some(NativeValue::Boolean(true)) => {
+                        Ok(map.get("value").cloned().unwrap_or(NativeValue::Null))
+                    },
+                    Some(NativeValue::Boolean(false)) => {
+                        let error = match map.get("error") {
+                            Some(NativeValue::String(s)) => s.clone(),
+                            _ => "unknown".into(),
+                        };
+                        Err(error)
+                    },
+                    _ => Err("unexpected_get_attribute_result".into()),
+                }
+            },
+            other => Err(format!("unexpected_get_attribute_result:{other:?}")),
+        }
+    }
+
+    fn get_cookies(&mut self, page_id: u64) -> Result<NativeValue, String> {
+        let script = "(() => { const raw = document.cookie; if (!raw || raw.length === 0) return []; return raw.split('; ').map(c => { const i = c.indexOf('='); return { name: i < 0 ? c : c.substring(0, i), value: i < 0 ? '' : c.substring(i + 1) }; }); })()".to_string();
+
+        self.evaluate(page_id, script)
+    }
+
+    fn set_cookie(&mut self, page_id: u64, cookie_string: &str) -> Result<(), String> {
+        let script = format!("document.cookie = {}", quote_js(cookie_string));
+
+        match self.evaluate(page_id, script) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn clear_cookies(&mut self, page_id: u64) -> Result<(), String> {
+        let script = "(() => { document.cookie.split('; ').forEach(c => { const name = c.split('=')[0]; document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'; }); })()".to_string();
+
+        match self.evaluate(page_id, script) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
         }
     }
 
