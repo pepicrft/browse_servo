@@ -20,6 +20,17 @@ defmodule BrowseServo.BrowserTest do
       [:browse_servo, :browser, :click, :stop],
       [:browse_servo, :browser, :fill, :stop],
       [:browse_servo, :browser, :wait_for, :stop],
+      [:browse_servo, :browser, :title, :stop],
+      [:browse_servo, :browser, :go_back, :stop],
+      [:browse_servo, :browser, :go_forward, :stop],
+      [:browse_servo, :browser, :reload, :stop],
+      [:browse_servo, :browser, :select_option, :stop],
+      [:browse_servo, :browser, :hover, :stop],
+      [:browse_servo, :browser, :get_text, :stop],
+      [:browse_servo, :browser, :get_attribute, :stop],
+      [:browse_servo, :browser, :get_cookies, :stop],
+      [:browse_servo, :browser, :set_cookie, :stop],
+      [:browse_servo, :browser, :clear_cookies, :stop],
       [:browse_servo, :browser, :terminate]
     ]
 
@@ -59,6 +70,12 @@ defmodule BrowseServo.BrowserTest do
     assert :ok = Browser.fill(browser, "#email", "user@example.com")
     assert :ok = Browser.wait_for(browser, "#done", timeout: 1_000)
 
+    assert {:ok, "Example Title"} = Browser.title(browser)
+    assert :ok = Browser.select_option(browser, "#choice", "beta")
+    assert :ok = Browser.hover(browser, "#hover-target")
+    assert {:ok, "mock text"} = Browser.get_text(browser, "#content")
+    assert {:ok, "mock-value"} = Browser.get_attribute(browser, "#content", "data-kind")
+
     assert_receive {:telemetry_event, [:browse_servo, :browser, :navigate, :stop], %{duration: _},
                     %{status: :ok}}
 
@@ -76,6 +93,50 @@ defmodule BrowseServo.BrowserTest do
 
     assert_receive {:telemetry_event, [:browse_servo, :browser, :wait_for, :stop], %{duration: _},
                     %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :title, :stop], %{duration: _},
+                    %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :select_option, :stop],
+                    %{duration: _}, %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :hover, :stop], %{duration: _},
+                    %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :get_text, :stop], %{duration: _},
+                    %{status: :ok}}
+
+    assert_receive {:telemetry_event, [:browse_servo, :browser, :get_attribute, :stop],
+                    %{duration: _}, %{status: :ok}}
+  end
+
+  test "supports navigation history" do
+    assert {:ok, browser} = Browser.start_link(native_module: BrowseServo.TestNative)
+
+    assert :ok = Browser.navigate(browser, "https://example.com/page-1")
+    assert {:ok, "https://example.com/page-1"} = Browser.current_url(browser)
+
+    assert :ok = Browser.navigate(browser, "https://example.com/page-2")
+    assert {:ok, "https://example.com/page-2"} = Browser.current_url(browser)
+
+    assert :ok = Browser.go_back(browser)
+    assert {:ok, "https://example.com/page-1"} = Browser.current_url(browser)
+
+    assert :ok = Browser.go_forward(browser)
+    assert {:ok, "https://example.com/page-2"} = Browser.current_url(browser)
+
+    assert :ok = Browser.reload(browser)
+    assert {:ok, "https://example.com/page-2"} = Browser.current_url(browser)
+
+    assert {:error, :navigation_history_unavailable} = Browser.go_forward(browser)
+  end
+
+  test "manages cookies" do
+    assert {:ok, browser} = Browser.start_link(native_module: BrowseServo.TestNative)
+
+    assert :ok = Browser.set_cookie(browser, %{"name" => "session", "value" => "abc123"})
+    assert {:ok, _cookies} = Browser.get_cookies(browser)
+    assert :ok = Browser.clear_cookies(browser)
   end
 
   test "emits terminate telemetry when the browser stops" do

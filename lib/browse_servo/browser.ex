@@ -62,6 +62,61 @@ defmodule BrowseServo.Browser do
     GenServer.call(browser, {:wait_for, locator, opts})
   end
 
+  @spec title(pid()) :: {:ok, String.t()} | {:error, term()}
+  def title(browser) do
+    GenServer.call(browser, :title)
+  end
+
+  @spec go_back(pid(), keyword()) :: :ok | {:error, term()}
+  def go_back(browser, opts \\ []) do
+    GenServer.call(browser, {:go_back, opts})
+  end
+
+  @spec go_forward(pid(), keyword()) :: :ok | {:error, term()}
+  def go_forward(browser, opts \\ []) do
+    GenServer.call(browser, {:go_forward, opts})
+  end
+
+  @spec reload(pid(), keyword()) :: :ok | {:error, term()}
+  def reload(browser, opts \\ []) do
+    GenServer.call(browser, {:reload, opts})
+  end
+
+  @spec select_option(pid(), term(), String.t(), keyword()) :: :ok | {:error, term()}
+  def select_option(browser, locator, value, opts \\ []) do
+    GenServer.call(browser, {:select_option, locator, value, opts})
+  end
+
+  @spec hover(pid(), term(), keyword()) :: :ok | {:error, term()}
+  def hover(browser, locator, opts \\ []) do
+    GenServer.call(browser, {:hover, locator, opts})
+  end
+
+  @spec get_text(pid(), term(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def get_text(browser, locator, opts \\ []) do
+    GenServer.call(browser, {:get_text, locator, opts})
+  end
+
+  @spec get_attribute(pid(), term(), String.t(), keyword()) :: {:ok, term()} | {:error, term()}
+  def get_attribute(browser, locator, name, opts \\ []) do
+    GenServer.call(browser, {:get_attribute, locator, name, opts})
+  end
+
+  @spec get_cookies(pid(), keyword()) :: {:ok, list()} | {:error, term()}
+  def get_cookies(browser, opts \\ []) do
+    GenServer.call(browser, {:get_cookies, opts})
+  end
+
+  @spec set_cookie(pid(), map(), keyword()) :: :ok | {:error, term()}
+  def set_cookie(browser, cookie, opts \\ []) do
+    GenServer.call(browser, {:set_cookie, cookie, opts})
+  end
+
+  @spec clear_cookies(pid(), keyword()) :: :ok | {:error, term()}
+  def clear_cookies(browser, opts \\ []) do
+    GenServer.call(browser, {:clear_cookies, opts})
+  end
+
   @impl true
   def init(opts) do
     native = native_module(opts)
@@ -74,10 +129,14 @@ defmodule BrowseServo.Browser do
     result =
       with {:ok, runtime} <- native.new_runtime(),
            {:ok, attrs} <- native.open_page(runtime, "about:blank") do
+        page = page_ref(attrs)
+
         state = %{
           native: native,
           runtime: runtime,
-          current_page: page_ref(attrs)
+          current_page: page,
+          history: [page.url],
+          history_index: 0
         }
 
         {:ok, state}
@@ -110,7 +169,16 @@ defmodule BrowseServo.Browser do
       telemetry_call(:navigate, %{browser: self(), page_id: page_id, url: url}, fn ->
         case state.native.navigate(state.runtime, page_id, url) do
           {:ok, attrs} ->
-            {:ok, :ok, %{state | current_page: page_ref(attrs)}}
+            page = page_ref(attrs)
+            new_history = Enum.take(state.history, state.history_index + 1) ++ [page.url]
+
+            {:ok, :ok,
+             %{
+               state
+               | current_page: page,
+                 history: new_history,
+                 history_index: length(new_history) - 1
+             }}
 
           {:error, reason} ->
             {:error, reason, state}
@@ -214,6 +282,125 @@ defmodule BrowseServo.Browser do
     {:reply, reply, state}
   end
 
+  def handle_call(:title, _from, state) do
+    reply =
+      telemetry_span(
+        :title,
+        %{browser: self(), page_id: state.current_page.id},
+        fn -> state.native.title(state.runtime, state.current_page.id) end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:go_back, _opts}, _from, state) do
+    case history_url(state, state.history_index - 1) do
+      {:ok, url, new_index} ->
+        {reply, next_state} =
+          navigate_to(state, :go_back, url, history_index: new_index)
+
+        {:reply, reply, next_state}
+
+      :error ->
+        {:reply, {:error, :navigation_history_unavailable}, state}
+    end
+  end
+
+  def handle_call({:go_forward, _opts}, _from, state) do
+    case history_url(state, state.history_index + 1) do
+      {:ok, url, new_index} ->
+        {reply, next_state} =
+          navigate_to(state, :go_forward, url, history_index: new_index)
+
+        {:reply, reply, next_state}
+
+      :error ->
+        {:reply, {:error, :navigation_history_unavailable}, state}
+    end
+  end
+
+  def handle_call({:reload, _opts}, _from, state) do
+    {reply, next_state} = navigate_to(state, :reload, state.current_page.url)
+    {:reply, reply, next_state}
+  end
+
+  def handle_call({:select_option, locator, value, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :select_option,
+        %{browser: self(), page_id: state.current_page.id, url: state.current_page.url},
+        fn -> perform_select_option(state, locator, value, opts) end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:hover, locator, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :hover,
+        %{browser: self(), page_id: state.current_page.id, url: state.current_page.url},
+        fn -> perform_hover(state, locator, opts) end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:get_text, locator, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :get_text,
+        %{browser: self(), page_id: state.current_page.id, url: state.current_page.url},
+        fn -> perform_get_text(state, locator, opts) end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:get_attribute, locator, name, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :get_attribute,
+        %{browser: self(), page_id: state.current_page.id, url: state.current_page.url},
+        fn -> perform_get_attribute(state, locator, name, opts) end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:get_cookies, _opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :get_cookies,
+        %{browser: self(), page_id: state.current_page.id},
+        fn -> state.native.get_cookies(state.runtime, state.current_page.id) end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:set_cookie, cookie, opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :set_cookie,
+        %{browser: self(), page_id: state.current_page.id},
+        fn -> perform_set_cookie(state, cookie, opts) end
+      )
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:clear_cookies, _opts}, _from, state) do
+    reply =
+      telemetry_span(
+        :clear_cookies,
+        %{browser: self(), page_id: state.current_page.id},
+        fn -> state.native.clear_cookies(state.runtime, state.current_page.id) end
+      )
+
+    {:reply, reply, state}
+  end
+
   @impl true
   def terminate(_reason, state) do
     Telemetry.execute(
@@ -287,6 +474,74 @@ defmodule BrowseServo.Browser do
       Keyword.get(opts, :timeout, 5_000)
     )
   end
+
+  defp perform_select_option(state, locator, value, _opts) do
+    state.native.select_option(state.runtime, state.current_page.id, selector(locator), value)
+  end
+
+  defp perform_hover(state, locator, _opts) do
+    state.native.hover(state.runtime, state.current_page.id, selector(locator))
+  end
+
+  defp perform_get_text(state, locator, _opts) do
+    state.native.get_text(state.runtime, state.current_page.id, selector(locator))
+  end
+
+  defp perform_get_attribute(state, locator, name, _opts) do
+    state.native.get_attribute(state.runtime, state.current_page.id, selector(locator), name)
+  end
+
+  defp perform_set_cookie(state, cookie, opts) when is_map(cookie) do
+    cookie_string = build_cookie_string(cookie, opts)
+    state.native.set_cookie(state.runtime, state.current_page.id, cookie_string)
+  end
+
+  defp build_cookie_string(cookie, opts) do
+    base = "#{Map.get(cookie, "name", "")}=#{Map.get(cookie, "value", "")}"
+    domain = Map.get(cookie, "domain") || Keyword.get(opts, :domain)
+    path = Map.get(cookie, "path") || Keyword.get(opts, :path)
+
+    [base]
+    |> append_cookie_part("domain", domain)
+    |> append_cookie_part("path", path)
+    |> Enum.join("; ")
+  end
+
+  defp append_cookie_part(parts, _key, nil), do: parts
+  defp append_cookie_part(parts, _key, false), do: parts
+  defp append_cookie_part(parts, key, value), do: parts ++ ["#{key}=#{value}"]
+
+  defp navigate_to(state, event, url, opts \\ []) do
+    telemetry_call(event, %{browser: self(), page_id: state.current_page.id, url: url}, fn ->
+      do_navigate(state, url, opts)
+    end)
+  end
+
+  defp do_navigate(state, url, opts) do
+    case state.native.navigate(state.runtime, state.current_page.id, url) do
+      {:ok, attrs} ->
+        new_state = apply_navigation(state, page_ref(attrs), opts)
+        {:ok, :ok, new_state}
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  end
+
+  defp apply_navigation(state, page, opts) do
+    new_state = %{state | current_page: page}
+
+    case Keyword.get(opts, :history_index) do
+      nil -> new_state
+      index -> %{new_state | history_index: index}
+    end
+  end
+
+  defp history_url(state, index) when index >= 0 and index < length(state.history) do
+    {:ok, Enum.at(state.history, index), index}
+  end
+
+  defp history_url(_state, _index), do: :error
 
   defp selector({:css, selector}) when is_binary(selector), do: selector
   defp selector(selector) when is_binary(selector), do: selector

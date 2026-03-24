@@ -64,4 +64,59 @@ defmodule BrowseServo.BrowseBackend do
   def wait_for(browser, locator, opts) do
     Browser.wait_for(browser, locator, opts)
   end
+
+  @impl Browse.Browser
+  def title(browser) do
+    Browser.title(browser)
+  end
+
+  @impl Browse.Browser
+  def go_back(browser, _opts) do
+    Browser.go_back(browser)
+  end
+
+  @impl Browse.Browser
+  def go_forward(browser, _opts) do
+    Browser.go_forward(browser)
+  end
+
+  @impl Browse.Browser
+  def reload(browser, _opts) do
+    Browser.reload(browser)
+  end
+
+  @impl Browse.Browser
+  def select_option(browser, locator, value, opts) do
+    Browser.select_option(browser, locator, value, opts)
+  end
+
+  @impl Browse.Browser
+  def hover(browser, locator, opts) do
+    Browser.hover(browser, locator, opts)
+  end
+
+  @impl Browse.Browser
+  def get_text(browser, locator, opts) do
+    Browser.get_text(browser, locator, opts)
+  end
+
+  @impl Browse.Browser
+  def get_attribute(browser, locator, name, opts) do
+    Browser.get_attribute(browser, locator, name, opts)
+  end
+
+  @impl Browse.Browser
+  def get_cookies(browser, _opts) do
+    Browser.get_cookies(browser)
+  end
+
+  @impl Browse.Browser
+  def set_cookie(browser, cookie, opts) do
+    Browser.set_cookie(browser, cookie, opts)
+  end
+
+  @impl Browse.Browser
+  def clear_cookies(browser, _opts) do
+    Browser.clear_cookies(browser)
+  end
 end
